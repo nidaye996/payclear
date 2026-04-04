@@ -29,6 +29,11 @@ class UserCreate(BaseModel):
     team_id: Optional[int] = None
 
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
 class UserOut(BaseModel):
     id: int
     username: str

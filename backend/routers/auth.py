@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 
 from database import get_db
 from models import User
-from schemas import TokenResponse, UserCreate, UserOut
+from schemas import TokenResponse, UserCreate, UserOut, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -115,11 +115,17 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/users", response_model=List[UserOut])
 def list_users(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_or_operator),
     db: Session = Depends(get_db)
 ):
-    """获取所有用户（管理员）"""
-    return db.query(User).all()
+    """获取用户列表（管理员看全部；操作员看队伍负责人+自己）"""
+    if current_user.role == "admin":
+        return db.query(User).all()
+    # 操作员：只看队伍负责人和自己
+    from sqlalchemy import or_
+    return db.query(User).filter(
+        or_(User.role == "team_leader", User.id == current_user.id)
+    ).all()
 
 
 @router.post("/users", response_model=UserOut)
@@ -148,20 +154,48 @@ def create_user(
     return new_user
 
 
-@router.put("/users/{user_id}/password")
-def change_password(
+@router.put("/users/{user_id}")
+def update_user(
     user_id: int,
-    new_password: str,
-    current_user: User = Depends(require_admin),
+    data: UserUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """修改用户密码（管理员）"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+    """修改用户账号/密码（权限分级）"""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
         raise HTTPException(status_code=404, detail="用户不存在")
-    user.password_hash = get_password_hash(new_password)
+
+    # 权限校验
+    if current_user.role == "admin":
+        pass  # 可修改任何人
+    elif current_user.role == "operator":
+        if current_user.id != user_id and target.role != "team_leader":
+            raise HTTPException(status_code=403, detail="无权修改该用户")
+    else:  # team_leader
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="只能修改自己的账号")
+
+    if not data.username and not data.password:
+        raise HTTPException(status_code=400, detail="请提供新用户名或新密码")
+
+    if data.username:
+        existing = db.query(User).filter(
+            User.username == data.username,
+            User.id != user_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="用户名已存在")
+        target.username = data.username
+
+    if data.password:
+        if len(data.password) < 6:
+            raise HTTPException(status_code=400, detail="密码至少6位")
+        target.password_hash = get_password_hash(data.password)
+
     db.commit()
-    return {"message": "密码已修改"}
+    db.refresh(target)
+    return {"message": "修改成功", "username": target.username}
 
 
 @router.delete("/users/{user_id}")

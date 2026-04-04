@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号管理 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card h2 { font-size: 16px; color: #333; font-weight: 600; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+        input[type="text"], input[type="password"], select {
+            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 14px; outline: none; transition: border-color 0.2s; background: white;
+        }
+        input:focus, select:focus { border-color: #2d6a9f; }
+
+        .btn { padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #f0f0f0; color: #555; }
+        .btn-secondary:hover { background: #e0e0e0; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 9px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; }
+        td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .role-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .role-admin { background: #fce8e8; color: #c0392b; }
+        .role-operator { background: #fff3cd; color: #856404; }
+        .role-leader { background: #e8f0fe; color: #2d6a9f; }
+
+        /* 我的账号卡片 */
+        .my-account-info { display: flex; align-items: center; gap: 16px; padding: 16px; background: #f0f5ff; border-radius: 8px; margin-bottom: 16px; }
+        .my-account-avatar { width: 48px; height: 48px; border-radius: 50%; background: #2d6a9f; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+        .my-account-detail { flex: 1; }
+        .my-account-name { font-size: 16px; font-weight: 600; color: #1a3a5c; }
+        .my-account-role { font-size: 12px; color: #888; margin-top: 2px; }
+
+        /* 编辑弹窗 */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: white; border-radius: 16px; padding: 32px; width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .modal-title { font-size: 17px; font-weight: 700; color: #1a3a5c; margin-bottom: 20px; }
+        .modal-hint { font-size: 12px; color: #999; margin-bottom: 16px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+        <a href="/accounts.html" class="nav-item active"><span class="icon">👤</span>账号管理</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">账号管理</div>
+
+        <div class="grid2">
+            <!-- 左列 -->
+            <div>
+                <!-- 我的账号（所有角色） -->
+                <div class="card">
+                    <h2>👤 我的账号</h2>
+                    <div class="my-account-info">
+                        <div class="my-account-avatar" id="my-avatar">-</div>
+                        <div class="my-account-detail">
+                            <div class="my-account-name" id="my-username">加载中...</div>
+                            <div class="my-account-role" id="my-role-label">-</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openEditModal(null)">修改账号/密码</button>
+                </div>
+
+                <!-- 创建账号（仅管理员） -->
+                <div class="card superadmin-only">
+                    <h2>➕ 创建账号</h2>
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="new-username" placeholder="输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="new-password" placeholder="输入密码（至少6位）">
+                    </div>
+                    <div class="form-group">
+                        <label>角色</label>
+                        <select id="new-role" onchange="toggleTeamSelect()">
+                            <option value="team_leader">队伍负责人</option>
+                            <option value="operator">操作员</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="user-team-group">
+                        <label>所属队伍</label>
+                        <select id="new-user-team">
+                            <option value="">-- 请选择队伍 --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="createUserNow()">创建账号</button>
+                </div>
+            </div>
+
+            <!-- 右列 -->
+            <div>
+                <!-- 队伍管理（仅管理员） -->
+                <div class="card superadmin-only">
+                    <h2>🏢 队伍管理</h2>
+                    <div style="display:flex;gap:10px;margin-bottom:16px">
+                        <input type="text" id="new-team-name" placeholder="队伍名称" style="flex:1">
+                        <input type="text" id="new-team-contact" placeholder="联系人（可选）" style="flex:1">
+                        <button class="btn btn-primary" onclick="createTeamNow()">添加</button>
+                    </div>
+                    <div id="team-list">
+                        <div style="text-align:center;padding:20px;color:#aaa">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 账号列表（管理员+操作员） -->
+                <div class="card admin-only">
+                    <h2>👥 账号列表</h2>
+                    <div id="user-list">
+                        <div style="text-align:center;padding:20px;color:#aaa">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- 编辑账号弹窗 -->
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal-box">
+        <div class="modal-title">修改账号/密码</div>
+        <div class="modal-hint">留空表示不修改该项</div>
+        <input type="hidden" id="edit-user-id">
+        <div class="form-group">
+            <label>新用户名</label>
+            <input type="text" id="edit-username" placeholder="留空则不修改">
+        </div>
+        <div class="form-group">
+            <label>新密码</label>
+            <input type="password" id="edit-password" placeholder="留空则不修改（至少6位）">
+        </div>
+        <div class="form-group">
+            <label>确认新密码</label>
+            <input type="password" id="edit-password2" placeholder="再次输入新密码">
+        </div>
+        <div id="edit-modal-error" style="color:#dc3545;font-size:13px;margin-top:4px;display:none"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+            <button class="btn btn-primary" id="edit-save-btn" onclick="saveEdit()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    let teamsData = [];
+    let currentUserId = null;
+
+    async function init() {
+        // 获取完整用户信息（含 id）
+        const me = await api.get('/auth/me');
+        currentUserId = me?.id;
+
+        document.getElementById('my-username').textContent = me?.username || '-';
+        document.getElementById('my-avatar').textContent = (me?.username || '?')[0].toUpperCase();
+        const roleMap = { admin: '管理员', operator: '操作员', team_leader: '队伍负责人' };
+        document.getElementById('my-role-label').textContent = roleMap[me?.role] || me?.role || '-';
+
+        const promises = [loadUsers()];
+        if (isAdmin()) promises.push(loadTeams());
+        await Promise.all(promises);
+    }
+
+    // ====== 队伍管理 ======
+
+    async function loadTeams() {
+        try {
+            teamsData = await getTeams() || [];
+            if (teamsData.length === 0) {
+                document.getElementById('team-list').innerHTML = '<div style="color:#aaa;font-size:13px">暂无队伍</div>';
+            } else {
+                const rows = teamsData.map(t => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5">
+                        <div>
+                            <strong>${t.name}</strong>
+                            <span style="font-size:12px;color:#888;margin-left:8px">${t.contact_person || ''}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="delTeam(${t.id}, '${t.name}')">删除</button>
+                    </div>
+                `).join('');
+                document.getElementById('team-list').innerHTML = rows;
+            }
+
+            const select = document.getElementById('new-user-team');
+            if (select) {
+                select.innerHTML = '<option value="">-- 请选择队伍 --</option>';
+                teamsData.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch(e) {
+            document.getElementById('team-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    async function createTeamNow() {
+        const name = document.getElementById('new-team-name').value.trim();
+        const contact = document.getElementById('new-team-contact').value.trim();
+        if (!name) { showToast('请输入队伍名称', 'warning'); return; }
+        try {
+            await createTeam(name, contact);
+            document.getElementById('new-team-name').value = '';
+            document.getElementById('new-team-contact').value = '';
+            await loadTeams();
+            showToast('队伍创建成功', 'success');
+        } catch(e) {
+            showToast('创建失败: ' + e.message, 'error');
+        }
+    }
+
+    async function delTeam(teamId, teamName) {
+        if (!confirm(`确认删除队伍"${teamName}"？该操作不可恢复。`)) return;
+        try {
+            await deleteTeam(teamId);
+            await loadTeams();
+            showToast('队伍已删除', 'success');
+        } catch(e) {
+            showToast('删除失败: ' + e.message, 'error');
+        }
+    }
+
+    // ====== 账号列表 ======
+
+    async function loadUsers() {
+        try {
+            const users = await api.get('/auth/users') || [];
+            const teamMap = {};
+            teamsData.forEach(t => teamMap[t.id] = t.name);
+
+            if (users.length === 0) {
+                document.getElementById('user-list').innerHTML = '<div style="color:#aaa;font-size:13px">暂无账号</div>';
+                return;
+            }
+
+            const rows = users.map(u => `
+                <tr>
+                    <td><strong>${u.username}</strong></td>
+                    <td>
+                        <span class="role-badge ${u.role === 'admin' ? 'role-admin' : u.role === 'operator' ? 'role-operator' : 'role-leader'}">
+                            ${u.role === 'admin' ? '管理员' : u.role === 'operator' ? '操作员' : '队伍负责人'}
+                        </span>
+                    </td>
+                    <td>${u.team_id ? (teamMap[u.team_id] || '#' + u.team_id) : '-'}</td>
+                    <td>${u.is_active ? '✅' : '❌'}</td>
+                    <td style="white-space:nowrap">
+                        <button class="btn btn-sm btn-primary" style="margin-right:4px" onclick="openEditModal(${u.id}, '${u.username}')">编辑</button>
+                        ${isAdmin() && u.id !== currentUserId ? `<button class="btn btn-sm btn-danger" onclick="disableUser(${u.id}, '${u.username}')">禁用</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('user-list').innerHTML = `
+                <table>
+                    <thead><tr><th>用户名</th><th>角色</th><th>队伍</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            document.getElementById('user-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    function toggleTeamSelect() {
+        const role = document.getElementById('new-role').value;
+        document.getElementById('user-team-group').style.display = role === 'team_leader' ? 'block' : 'none';
+    }
+
+    async function createUserNow() {
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value;
+        const role = document.getElementById('new-role').value;
+        const teamId = document.getElementById('new-user-team').value;
+
+        if (!username) { showToast('请输入用户名', 'warning'); return; }
+        if (!password || password.length < 6) { showToast('密码至少6位', 'warning'); return; }
+        if (role === 'team_leader' && !teamId) { showToast('请选择所属队伍', 'warning'); return; }
+
+        try {
+            await api.post('/auth/users', {
+                username, password, role,
+                team_id: teamId ? parseInt(teamId) : null,
+            });
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            await loadUsers();
+            showToast('账号创建成功', 'success');
+        } catch(e) {
+            showToast('创建失败: ' + e.message, 'error');
+        }
+    }
+
+    async function disableUser(userId, username) {
+        if (!confirm(`确认禁用账号"${username}"？`)) return;
+        try {
+            await api.delete(`/auth/users/${userId}`);
+            await loadUsers();
+            showToast('账号已禁用', 'success');
+        } catch(e) {
+            showToast('操作失败: ' + e.message, 'error');
+        }
+    }
+
+    // ====== 编辑账号弹窗 ======
+
+    function openEditModal(userId, username) {
+        // userId 为 null 表示编辑自己
+        const info = getUserInfo();
+        const targetId = userId ?? info?.id;
+        document.getElementById('edit-user-id').value = targetId;
+        document.getElementById('edit-username').value = '';
+        document.getElementById('edit-password').value = '';
+        document.getElementById('edit-password2').value = '';
+        document.getElementById('edit-modal-error').style.display = 'none';
+        document.getElementById('edit-modal').classList.add('show');
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.remove('show');
+    }
+
+    async function saveEdit() {
+        const userId = parseInt(document.getElementById('edit-user-id').value);
+        const username = document.getElementById('edit-username').value.trim();
+        const password = document.getElementById('edit-password').value;
+        const password2 = document.getElementById('edit-password2').value;
+        const errEl = document.getElementById('edit-modal-error');
+
+        errEl.style.display = 'none';
+
+        if (!username && !password) {
+            errEl.textContent = '请填写新用户名或新密码';
+            errEl.style.display = 'block';
+            return;
+        }
+        if (password && password.length < 6) {
+            errEl.textContent = '密码至少6位';
+            errEl.style.display = 'block';
+            return;
+        }
+        if (password && password !== password2) {
+            errEl.textContent = '两次密码不一致';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('edit-save-btn');
+        btn.disabled = true;
+        try {
+            const body = {};
+            if (username) body.username = username;
+            if (password) body.password = password;
+
+            const result = await api.put(`/auth/users/${userId}`, body);
+
+            // 如果改的是自己的用户名，更新本地存储
+            const info = getUserInfo();
+            if (userId === info?.id && username) {
+                const stored = JSON.parse(localStorage.getItem('user_info') || '{}');
+                stored.username = username;
+                localStorage.setItem('user_info', JSON.stringify(stored));
+            }
+
+            closeEditModal();
+            showToast(result.message || '修改成功', 'success');
+            await init();
+        } catch(e) {
+            errEl.textContent = e.message;
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // 点击遮罩关闭弹窗
+    document.getElementById('edit-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+    });
+
+    init();
+</script>
+</body>
+</html>
