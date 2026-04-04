@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工人信息 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+
+        /* Tab 导航 */
+        .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab-btn { padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; font-weight: 500; }
+        .tab-btn.active { color: #2d6a9f; border-bottom-color: #2d6a9f; font-weight: 600; }
+        .tab-btn:hover { color: #2d6a9f; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .filter-bar input, .filter-bar select {
+            padding: 9px 14px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; outline: none; background: white;
+        }
+        .filter-bar input:focus, .filter-bar select:focus { border-color: #2d6a9f; }
+        .filter-bar input[type="text"] { min-width: 240px; }
+
+        .btn { padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #e67e22; color: white; }
+        .btn-warning:hover { background: #ca6f1e; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .id-card-text { font-family: monospace; font-size: 12px; color: #555; }
+
+        /* 状态标签 */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-pending { background: #fff3e0; color: #e67e22; border: 1px solid #f0ad4e; }
+        .badge-confirmed { background: #e8f8f0; color: #27ae60; border: 1px solid #82d9a8; }
+
+        /* 分页 */
+        .pagination { display: flex; align-items: center; gap: 8px; margin-top: 16px; justify-content: center; }
+        .page-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .page-btn:hover { border-color: #2d6a9f; color: #2d6a9f; }
+        .page-btn.active { background: #2d6a9f; color: white; border-color: #2d6a9f; }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-info { font-size: 13px; color: #888; }
+
+        /* 工人详情弹窗 */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: white; border-radius: 16px;
+            padding: 0; width: 620px; max-width: 92vw;
+            max-height: 85vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .modal-header h3 { font-size: 16px; color: #333; }
+
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; line-height: 1; }
+        .modal-close:hover { color: #333; }
+
+        .modal-body { padding: 24px; overflow-y: auto; }
+
+        .info-row { display: flex; margin-bottom: 12px; font-size: 14px; }
+        .info-label { width: 100px; color: #888; flex-shrink: 0; }
+        .info-value { color: #333; font-weight: 500; }
+
+        .history-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        .history-table th { background: #f8f9fa; padding: 8px 10px; text-align: left; color: #666; }
+        .history-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+
+        .current-badge { background: #d4edda; color: #155724; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+
+        .loading { text-align: center; padding: 40px; color: #aaa; }
+        .empty { text-align: center; padding: 60px; color: #aaa; font-size: 15px; }
+
+        .modal-footer { padding: 16px 24px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+        .btn-edit { background: #f0ad4e; color: white; }
+        .btn-edit:hover { background: #ec971f; }
+        .btn-save { background: #28a745; color: white; }
+        .btn-save:hover { background: #218838; }
+        .btn-cancel-edit { background: #6c757d; color: white; }
+        .edit-form { display: none; }
+        .edit-form.show { display: block; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+        .form-group input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+        .form-group input:focus { border-color: #2d6a9f; }
+
+        /* 二次确认弹窗 */
+        .confirm-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6); z-index: 2000;
+            align-items: center; justify-content: center;
+        }
+        .confirm-overlay.show { display: flex; }
+        .confirm-box {
+            background: white; border-radius: 12px; padding: 28px;
+            width: 420px; max-width: 90vw;
+        }
+        .confirm-box h4 { font-size: 16px; color: #333; margin-bottom: 12px; }
+        .confirm-box p { font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 16px; }
+        .confirm-box .warning-text { color: #e67e22; font-size: 13px; background: #fff3e0; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
+        .confirm-box textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; resize: vertical; min-height: 80px; outline: none; margin-bottom: 16px; }
+        .confirm-box textarea:focus { border-color: #2d6a9f; }
+        .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item active"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section admin-only">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">工人信息库</div>
+
+        <div class="card">
+            <!-- Tab 切换 -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('workers')">全部工人</button>
+            </div>
+
+            <!-- 全部工人 Tab -->
+            <div id="tab-workers" class="tab-panel active">
+                <!-- 筛选栏 -->
+                <div class="filter-bar">
+                    <input type="text" id="search-input" placeholder="搜索姓名或身份证号..." oninput="debounceSearch()">
+                    <select id="team-filter" onchange="loadWorkers(1)">
+                        <option value="">全部队伍</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadWorkers(1)">🔍 搜索</button>
+                    <span id="total-count" style="font-size:13px;color:#888;margin-left:auto"></span>
+                </div>
+
+                <!-- 表格 -->
+                <div id="worker-table-container">
+                    <div class="loading">加载中...</div>
+                </div>
+
+                <!-- 分页 -->
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- 工人详情弹窗 -->
+<div class="modal-overlay" id="worker-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">工人详情</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body">
+            <div class="loading">加载中...</div>
+        </div>
+        <div class="modal-footer" id="modal-footer" style="display:none">
+            <button class="btn btn-cancel-edit" onclick="cancelEdit()" id="btn-cancel" style="display:none">取消</button>
+            <button class="btn btn-save" onclick="saveWorker()" id="btn-save" style="display:none">保存</button>
+            <button class="btn btn-edit admin-only" onclick="enterEdit()" id="btn-edit">编辑</button>
+            <button class="btn admin-only" onclick="promptDeleteWorker()" id="btn-delete" style="background:#dc3545;color:white;display:none">删除</button>
+        </div>
+    </div>
+</div>
+
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    let currentPage = 1;
+    let totalPages = 1;
+    let searchTimer = null;
+    let currentWorkerId = null;
+    let currentWorkerData = null;
+    let teamMap = {};  // team_id → team_name
+
+    async function init() {
+        // 加载队伍列表
+        try {
+            const teams = await getTeams();
+            const select = document.getElementById('team-filter');
+            (teams || []).forEach(t => {
+                teamMap[t.id] = t.name;
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                select.appendChild(opt);
+            });
+
+            // 非管理员自动选中队伍
+            const userInfo = getUserInfo();
+            if (userInfo && userInfo.team_id && !isAdminOrOperator()) {
+                select.value = userInfo.team_id;
+                select.disabled = true;
+            }
+        } catch(e) {}
+
+        loadWorkers(1);
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelector('.tab-btn:first-child').classList.add('active');
+        document.getElementById('tab-workers').classList.add('active');
+        loadWorkers(currentPage);
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadWorkers(1), 400);
+    }
+
+    function statusBadge(status) {
+        return '<span class="badge badge-confirmed">正式</span>';
+    }
+
+    async function loadWorkers(page = 1) {
+        currentPage = page;
+        const search = document.getElementById('search-input').value.trim();
+        const teamId = document.getElementById('team-filter').value;
+        const params = { page, page_size: 20 };
+        if (search) params.search = search;
+        if (teamId) params.team_id = teamId;
+
+        document.getElementById('worker-table-container').innerHTML =
+            '<div class="loading">加载中...</div>';
+
+        try {
+            const result = await getWorkers(params);
+            const workers = result.items || [];
+            const total = result.total || 0;
+            const pageSize = result.page_size || 20;
+            totalPages = Math.ceil(total / pageSize);
+
+            document.getElementById('total-count').textContent = `共 ${total} 名工人`;
+
+            if (workers.length === 0) {
+                document.getElementById('worker-table-container').innerHTML =
+                    '<div class="empty">👷 暂无工人数据</div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            const rows = workers.map(w => {
+                const bankInfo = (w.bank_infos || []).find(b => !b.valid_to) || (w.bank_infos || [])[0] || {};
+                const workerStatus = bankInfo.status || 'confirmed';
+                return `
+                    <tr style="cursor:pointer" onclick="showWorker(${w.id})">
+                        <td><strong>${w.name}</strong></td>
+                        <td class="id-card-text">${maskIdCard(w.id_card)}</td>
+                        <td>${w.phone || '-'}</td>
+                        <td style="font-family:monospace;font-size:12px">${bankInfo.bank_card ? bankInfo.bank_card.slice(0,4) + '****' + bankInfo.bank_card.slice(-4) : '-'}</td>
+                        <td>${bankInfo.bank_name || '-'}</td>
+                        <td style="font-family:monospace;font-size:12px">${bankInfo.routing_number || '-'}</td>
+                        <td style="font-size:12px;color:#555">${bankInfo.team_id ? (teamMap[bankInfo.team_id] || '队伍'+bankInfo.team_id) : '-'}</td>
+                        <td>${statusBadge(workerStatus)}</td>
+                        <td style="font-size:12px;color:#888">${formatDate(w.created_at)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('worker-table-container').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>姓名</th><th>身份证号</th><th>手机号</th>
+                            <th>银行卡号</th><th>开户银行</th><th>联行号</th>
+                            <th>队伍</th><th>状态</th><th>入库时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+
+            renderPagination(page, totalPages);
+
+        } catch(e) {
+            document.getElementById('worker-table-container').innerHTML =
+                `<div class="loading" style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    function renderPagination(current, total, containerId = 'pagination', loadFn = loadWorkers) {
+        if (total <= 1) {
+            document.getElementById(containerId).innerHTML = '';
+            return;
+        }
+
+        let html = `<button class="page-btn" onclick="${loadFn.name}(${current-1})" ${current<=1?'disabled':''}>← 上一页</button>`;
+        html += `<span class="page-info">第 ${current} / ${total} 页</span>`;
+        html += `<button class="page-btn" onclick="${loadFn.name}(${current+1})" ${current>=total?'disabled':''}>下一页 →</button>`;
+
+        document.getElementById(containerId).innerHTML = html;
+    }
+
+    // ==================== 工人详情弹窗 ====================
+
+    async function showWorker(workerId) {
+        currentWorkerId = workerId;
+        document.getElementById('worker-modal').classList.add('show');
+        document.getElementById('modal-footer').style.display = 'none';
+        document.getElementById('modal-body').innerHTML = '<div class="loading">加载中...</div>';
+
+        try {
+            const worker = await getWorker(workerId);
+            currentWorkerData = worker;
+
+            const currentInfo = (worker.bank_infos || []).find(b => !b.valid_to);
+
+            document.getElementById('modal-title').textContent = `👷 ${worker.name} 的信息`;
+
+            let bankHistoryHtml = '';
+            if (worker.bank_infos && worker.bank_infos.length > 0) {
+                const rows = worker.bank_infos.map(b => `
+                    <tr>
+                        <td>${b.valid_from || '-'}</td>
+                        <td>${b.valid_to || '<span class="current-badge">当前有效</span>'}</td>
+                        <td style="font-family:monospace;font-size:12px">${b.bank_card || '-'}</td>
+                        <td>${b.bank_name || '-'}</td>
+                        <td style="font-family:monospace;font-size:11px">${b.routing_number || '-'}</td>
+                        <td>${statusBadge(b.status || 'confirmed')}</td>
+                    </tr>
+                `).join('');
+
+                bankHistoryHtml = `
+                    <h4 style="margin-bottom:8px;color:#555;font-size:14px">银行信息历史</h4>
+                    <table class="history-table">
+                        <thead>
+                            <tr><th>生效月份</th><th>失效月份</th><th>银行卡号</th><th>开户银行</th><th>联行号</th><th>状态</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            }
+
+            document.getElementById('modal-body').innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">姓名</span>
+                    <span class="info-value">${worker.name}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">身份证号</span>
+                    <span class="info-value" style="font-family:monospace">${worker.id_card}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">手机号</span>
+                    <span class="info-value">${worker.phone || '未记录'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">入库时间</span>
+                    <span class="info-value">${formatDate(worker.created_at)}</span>
+                </div>
+
+                ${currentInfo ? `
+                <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
+                    <div style="font-weight:600;margin-bottom:10px;color:#555;font-size:14px">
+                        当前有效银行信息
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">银行卡号</span>
+                        <span class="info-value" style="font-family:monospace">${currentInfo.bank_card || '-'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">开户银行</span>
+                        <span class="info-value">${currentInfo.bank_name || '-'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">联行号</span>
+                        <span class="info-value" style="font-family:monospace">${currentInfo.routing_number || '-'}</span>
+                    </div>
+                </div>
+                ` : ''}
+
+                ${bankHistoryHtml}
+
+                <!-- 编辑表单（默认隐藏） -->
+                <div class="edit-form" id="edit-form">
+                    <h4 style="margin-bottom:12px;color:#555;font-size:14px;border-top:1px solid #eee;padding-top:16px">编辑信息</h4>
+                    <div class="form-group"><label>姓名</label><input id="edit-name" value="${worker.name || ''}"></div>
+                    <div class="form-group"><label>手机号</label><input id="edit-phone" value="${worker.phone || ''}"></div>
+                    <div class="form-group"><label>银行卡号</label><input id="edit-bank-card" value="${currentInfo ? currentInfo.bank_card || '' : ''}"></div>
+                    <div class="form-group"><label>开户银行</label><input id="edit-bank-name" value="${currentInfo ? currentInfo.bank_name || '' : ''}"></div>
+                    <div class="form-group"><label>联行号</label><input id="edit-routing" value="${currentInfo ? currentInfo.routing_number || '' : ''}"></div>
+                </div>
+            `;
+
+            // 显示底部按钮（仅管理员）
+            const userInfo = getUserInfo();
+            if (userInfo && isAdminOrOperator()) {
+                document.getElementById('modal-footer').style.display = 'flex';
+                document.getElementById('btn-edit').style.display = 'inline-block';
+                document.getElementById('btn-save').style.display = 'none';
+                document.getElementById('btn-cancel').style.display = 'none';
+                document.getElementById('btn-delete').style.display = 'inline-block';
+            }
+
+        } catch(e) {
+            document.getElementById('modal-body').innerHTML =
+                `<div style="color:#dc3545;text-align:center;padding:20px">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('worker-modal').classList.remove('show');
+        cancelEdit();
+    }
+
+    function enterEdit() {
+        document.getElementById('edit-form').classList.add('show');
+        document.getElementById('btn-edit').style.display = 'none';
+        document.getElementById('btn-save').style.display = 'inline-block';
+        document.getElementById('btn-cancel').style.display = 'inline-block';
+    }
+
+    function cancelEdit() {
+        const form = document.getElementById('edit-form');
+        if (form) form.classList.remove('show');
+        const btnEdit = document.getElementById('btn-edit');
+        const btnSave = document.getElementById('btn-save');
+        const btnCancel = document.getElementById('btn-cancel');
+        if (btnEdit) btnEdit.style.display = 'inline-block';
+        if (btnSave) btnSave.style.display = 'none';
+        if (btnCancel) btnCancel.style.display = 'none';
+    }
+
+    async function saveWorker() {
+        const payload = {
+            name: document.getElementById('edit-name').value.trim(),
+            phone: document.getElementById('edit-phone').value.trim(),
+            bank_card: document.getElementById('edit-bank-card').value.trim(),
+            bank_name: document.getElementById('edit-bank-name').value.trim(),
+            routing_number: document.getElementById('edit-routing').value.trim(),
+        };
+
+        try {
+            await apiRequest(`/api/workers/${currentWorkerId}`, { method: 'PUT', body: JSON.stringify(payload) });
+            showToast('保存成功', 'success');
+            closeModal();
+            loadWorkers(currentPage);
+        } catch(e) {
+            showToast('保存失败：' + e.message, 'error');
+        }
+    }
+
+    // ==================== 删除工人 ====================
+
+    function promptDeleteWorker() {
+        if (!currentWorkerData) return;
+        const name = currentWorkerData.name;
+        const idCard = currentWorkerData.id_card;
+        // 第一次确认
+        if (!confirm(`确定要删除工人【${name}】吗？\n身份证：${idCard}\n\n删除后数据将备份到归档表，不可直接恢复。`)) return;
+        // 第二次确认
+        const input = prompt(`请再次输入工人姓名【${name}】以确认删除：`);
+        if (input !== name) {
+            alert('姓名不匹配，已取消删除。');
+            return;
+        }
+        const reason = prompt('请输入删除原因（可选，直接回车跳过）：') || '';
+        doDeleteWorker(reason);
+    }
+
+    async function doDeleteWorker(reason) {
+        try {
+            await apiRequest(`/api/workers/${currentWorkerId}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ reason: reason || null })
+            });
+            alert('删除成功，数据已归档。');
+            closeModal();
+            loadWorkers(currentPage);
+        } catch(e) {
+            alert('删除失败：' + e.message);
+        }
+    }
+
+    // 点击遮罩关闭
+    document.getElementById('worker-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
+    init();
+</script>
+</body>
+</html>

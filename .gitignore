@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 数据库文件（包含真实工人数据，不上传）
+*.db
+*.db-shm
+*.db-wal
+*.db.before_restore
+backend/data/
+
+# 临时文件
+*.tmp
+*.log
+*.bak
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境变量
+.env
+.env.local

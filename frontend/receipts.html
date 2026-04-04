@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回执上传 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+
+        .btn { padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-primary:disabled { background: #a0c0dc; cursor: not-allowed; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+
+        /* 上传区域 */
+        .upload-area {
+            border: 2px dashed #c8d8e8;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8fbff;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover, .upload-area.drag-over { border-color: #2d6a9f; background: #eef4fc; }
+        .upload-area .upload-icon { font-size: 48px; margin-bottom: 12px; }
+        .upload-area p { color: #666; font-size: 14px; margin-bottom: 6px; }
+        .upload-area .hint { font-size: 12px; color: #aaa; }
+        .upload-area input[type="file"] { display: none; }
+
+        .form-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+        .form-group label { font-size: 13px; color: #666; font-weight: 500; }
+        .form-group select, .form-group input {
+            padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; outline: none;
+        }
+        .form-group select:focus, .form-group input:focus { border-color: #2d6a9f; }
+
+        /* 统计卡片 */
+        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-box {
+            flex: 1; min-width: 140px;
+            background: #f8f9fa; border-radius: 10px; padding: 18px 20px;
+            text-align: center;
+        }
+        .stat-box .stat-num { font-size: 32px; font-weight: 700; }
+        .stat-box .stat-label { font-size: 13px; color: #888; margin-top: 4px; }
+        .stat-box.total .stat-num { color: #2d6a9f; }
+        .stat-box.success .stat-num { color: #27ae60; }
+        .stat-box.fail .stat-num { color: #e74c3c; }
+        .stat-box.unmatched .stat-num { color: #e67e22; }
+
+        /* 结果表格 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-success { background: #e8f8f0; color: #27ae60; }
+        .badge-fail { background: #fce8e8; color: #e74c3c; }
+        .badge-pending { background: #fff3e0; color: #e67e22; }
+        .badge-confirmed { background: #e8f8f0; color: #27ae60; }
+
+        .loading { text-align: center; padding: 40px; color: #aaa; }
+        .empty { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+
+        /* 历史记录 Tab */
+        .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab-btn { padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; font-weight: 500; }
+        .tab-btn.active { color: #2d6a9f; border-bottom-color: #2d6a9f; font-weight: 600; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .file-selected { font-size: 13px; color: #2d6a9f; font-weight: 600; margin-top: 8px; }
+
+        .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+        .alert-info { background: #e8f0fe; color: #2d6a9f; border: 1px solid #b3cde8; }
+        .alert-success { background: #e8f8f0; color: #27ae60; border: 1px solid #82d9a8; }
+        .alert-warning { background: #fff3e0; color: #e67e22; border: 1px solid #f0c080; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item admin-only"><span class="icon">👷</span>工人信息</a>
+        <a href="/receipts.html" class="nav-item active admin-only"><span class="icon">📄</span>回执上传</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section admin-only">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">打款回执上传</div>
+
+        <div class="card">
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('upload')">上传解析</button>
+                <button class="tab-btn" onclick="switchTab('history')">历史记录</button>
+            </div>
+
+            <!-- 上传解析 Tab -->
+            <div id="tab-upload" class="tab-panel active">
+                <div class="alert alert-info">
+                    📋 支持银行批量代付回执PDF文件。解析后将按银行卡号匹配暂存库工人，打款成功的工人自动入正式库，失败的保持暂存状态。
+                </div>
+
+                <!-- 上传表单 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>所属队伍 *</label>
+                        <select id="team-select">
+                            <option value="">请选择队伍...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>关联提交记录（可选）</label>
+                        <input type="number" id="submission-id-input" placeholder="提交记录ID（可留空）">
+                    </div>
+                </div>
+
+                <!-- 拖拽上传区域 -->
+                <div class="upload-area" id="upload-area" onclick="document.getElementById('pdf-file-input').click()">
+                    <div class="upload-icon">📄</div>
+                    <p>点击或拖拽 PDF 回执文件到此处</p>
+                    <p class="hint">仅支持 .pdf 格式，文件大小不超过 20MB</p>
+                    <input type="file" id="pdf-file-input" accept=".pdf" onchange="onFileSelected(this)">
+                    <div id="file-selected-name" class="file-selected" style="display:none"></div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-upload" onclick="doUpload()" disabled>
+                    🔍 解析并上传
+                </button>
+
+                <!-- 解析结果 -->
+                <div id="upload-result" style="margin-top:24px"></div>
+            </div>
+
+            <!-- 历史记录 Tab -->
+            <div id="tab-history" class="tab-panel">
+                <div id="history-container">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    let selectedFile = null;
+
+    async function init() {
+        // 仅管理员可访问
+        const userInfo = getUserInfo();
+        if (!userInfo || userInfo.role !== 'admin') {
+            alert('此页面仅管理员可访问');
+            window.location.href = '/dashboard.html';
+            return;
+        }
+
+        // 加载队伍列表
+        try {
+            const teams = await getTeams();
+            const select = document.getElementById('team-select');
+            (teams || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                select.appendChild(opt);
+            });
+        } catch(e) {}
+
+        // 拖拽上传
+        const area = document.getElementById('upload-area');
+        area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
+        area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+        area.addEventListener('drop', e => {
+            e.preventDefault();
+            area.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.toLowerCase().endsWith('.pdf')) {
+                setSelectedFile(file);
+            } else {
+                showToast('请拖入 PDF 文件', 'error');
+            }
+        });
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+        if (tab === 'upload') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('tab-upload').classList.add('active');
+        } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('tab-history').classList.add('active');
+            loadHistory();
+        }
+    }
+
+    function onFileSelected(input) {
+        const file = input.files[0];
+        if (file) setSelectedFile(file);
+    }
+
+    function setSelectedFile(file) {
+        selectedFile = file;
+        const nameEl = document.getElementById('file-selected-name');
+        nameEl.style.display = 'block';
+        nameEl.textContent = `已选择：${file.name}（${(file.size / 1024).toFixed(1)} KB）`;
+        document.getElementById('btn-upload').disabled = false;
+    }
+
+    async function doUpload() {
+        const teamId = document.getElementById('team-select').value;
+        const submissionId = document.getElementById('submission-id-input').value.trim();
+
+        if (!teamId) {
+            showToast('请先选择所属队伍', 'warning');
+            return;
+        }
+        if (!selectedFile) {
+            showToast('请先选择PDF文件', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btn-upload');
+        btn.disabled = true;
+        btn.textContent = '解析中...';
+        document.getElementById('upload-result').innerHTML = '<div class="loading">正在解析 PDF，请稍候...</div>';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('team_id', teamId);
+            if (submissionId) formData.append('submission_id', submissionId);
+
+            const result = await uploadReceipt(formData);
+            renderResult(result);
+        } catch(e) {
+            document.getElementById('upload-result').innerHTML =
+                `<div class="alert alert-warning">解析失败：${e.message}</div>`;
+            showToast('解析失败：' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔍 解析并上传';
+        }
+    }
+
+    function renderResult(result) {
+        const container = document.getElementById('upload-result');
+
+        // 统计卡片
+        let html = `
+            <div class="stats-row">
+                <div class="stat-box total">
+                    <div class="stat-num">${result.total_count || 0}</div>
+                    <div class="stat-label">解析总笔数</div>
+                </div>
+                <div class="stat-box success">
+                    <div class="stat-num">${result.success_count || 0}</div>
+                    <div class="stat-label">打款成功（已入库）</div>
+                </div>
+                <div class="stat-box fail">
+                    <div class="stat-num">${result.fail_count || 0}</div>
+                    <div class="stat-label">打款失败（待处理）</div>
+                </div>
+                <div class="stat-box unmatched">
+                    <div class="stat-num">${result.unmatched_count || 0}</div>
+                    <div class="stat-label">未匹配工人</div>
+                </div>
+            </div>
+        `;
+
+        if (result.message) {
+            html += `<div class="alert alert-success">${result.message}</div>`;
+        }
+
+        // 成功工人列表
+        const successWorkers = result.success_workers || [];
+        if (successWorkers.length > 0) {
+            const rows = successWorkers.map(w => `
+                <tr>
+                    <td>${w.name}</td>
+                    <td>${w.worker_name_db || '-'}</td>
+                    <td style="font-family:monospace;font-size:12px">${w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-'}</td>
+                    <td style="color:#27ae60;font-weight:600">￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
+                    <td><span class="badge badge-success">打款成功</span></td>
+                    <td><span class="badge badge-confirmed">已入正式库</span></td>
+                </tr>
+            `).join('');
+            html += `
+                <h3 style="font-size:15px;color:#27ae60;margin-bottom:12px">✅ 打款成功（${successWorkers.length} 人）</h3>
+                <table style="margin-bottom:24px">
+                    <thead><tr><th>回执姓名</th><th>库中姓名</th><th>银行卡号</th><th>金额</th><th>打款状态</th><th>入库状态</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        // 失败工人列表
+        const failWorkers = result.fail_workers || [];
+        if (failWorkers.length > 0) {
+            const rows = failWorkers.map(w => `
+                <tr>
+                    <td>${w.name}</td>
+                    <td>${w.worker_name_db || '-'}</td>
+                    <td style="font-family:monospace;font-size:12px">${w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-'}</td>
+                    <td style="color:#e74c3c;font-weight:600">￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
+                    <td><span class="badge badge-fail">打款失败</span></td>
+                    <td><span class="badge badge-pending">仍在暂存库</span></td>
+                </tr>
+            `).join('');
+            html += `
+                <h3 style="font-size:15px;color:#e74c3c;margin-bottom:12px">❌ 打款失败（${failWorkers.length} 人）— 需人工处理</h3>
+                <table style="margin-bottom:24px">
+                    <thead><tr><th>回执姓名</th><th>库中姓名</th><th>银行卡号</th><th>金额</th><th>打款状态</th><th>入库状态</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        // 未匹配列表
+        const unmatched = result.unmatched || [];
+        if (unmatched.length > 0) {
+            const rows = unmatched.map(w => `
+                <tr>
+                    <td>${w.name}</td>
+                    <td style="font-family:monospace;font-size:12px">${w.bank_card}</td>
+                    <td>￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
+                    <td>${w.status}</td>
+                    <td style="color:#e67e22;font-size:12px">${w.reason || '未匹配到工人'}</td>
+                </tr>
+            `).join('');
+            html += `
+                <h3 style="font-size:15px;color:#e67e22;margin-bottom:12px">⚠️ 未匹配工人（${unmatched.length} 笔）</h3>
+                <table>
+                    <thead><tr><th>姓名</th><th>银行卡号</th><th>金额</th><th>状态</th><th>原因</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    // ==================== 历史记录 ====================
+
+    async function loadHistory() {
+        document.getElementById('history-container').innerHTML = '<div class="loading">加载中...</div>';
+
+        try {
+            const result = await getReceipts({ page: 1, page_size: 20 });
+            const items = result.items || [];
+
+            if (items.length === 0) {
+                document.getElementById('history-container').innerHTML =
+                    '<div class="empty">暂无回执上传记录</div>';
+                return;
+            }
+
+            const rows = items.map(r => `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${formatDate(r.uploaded_at)}</td>
+                    <td>${r.uploader_name}</td>
+                    <td>${r.total_count}</td>
+                    <td style="color:#27ae60;font-weight:600">${r.success_count}</td>
+                    <td style="color:#e74c3c;font-weight:600">${r.fail_count}</td>
+                    <td>
+                        <a href="#" onclick="viewDetail(${r.id}); return false;"
+                           style="color:#2d6a9f;text-decoration:none;font-size:12px">查看详情</a>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('history-container').innerHTML = `
+                <div style="font-size:13px;color:#888;margin-bottom:12px">共 ${result.total || 0} 条记录</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>上传时间</th><th>操作人</th>
+                            <th>总笔数</th><th>成功</th><th>失败</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            document.getElementById('history-container').innerHTML =
+                `<div class="loading" style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    async function viewDetail(receiptId) {
+        try {
+            const detail = await getReceiptDetail(receiptId);
+            // 将结果渲染到上传 Tab 并切换过去
+            switchTab('upload');
+            renderResult({
+                total_count: detail.total_count,
+                success_count: detail.success_count,
+                fail_count: detail.fail_count,
+                unmatched_count: (detail.unmatched || []).length,
+                message: `回执 #${receiptId} 详情（上传于 ${formatDate(detail.uploaded_at)}）`,
+                success_workers: detail.success_workers || [],
+                fail_workers: detail.fail_workers || [],
+                unmatched: detail.unmatched || [],
+            });
+        } catch(e) {
+            showToast('加载详情失败：' + e.message, 'error');
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

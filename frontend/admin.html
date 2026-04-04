@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card h2 { font-size: 16px; color: #333; font-weight: 600; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+        input[type="text"], input[type="password"], select {
+            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 14px; outline: none; transition: border-color 0.2s; background: white;
+        }
+        input:focus, select:focus { border-color: #2d6a9f; }
+
+        .btn { padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 9px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; }
+        td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .role-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .role-admin { background: #fce8e8; color: #c0392b; }
+        .role-operator { background: #fff3cd; color: #856404; }
+        .role-leader { background: #e8f0fe; color: #2d6a9f; }
+
+        .bank-stats { display: flex; align-items: center; gap: 16px; padding: 16px; background: #f8f9fa; border-radius: 8px; margin-bottom: 16px; }
+        .bank-stats .num { font-size: 28px; font-weight: 700; color: #2d6a9f; }
+        .bank-stats .lbl { font-size: 13px; color: #888; }
+
+        .upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+        .upload-area:hover { border-color: #2d6a9f; background: #f8fbff; }
+        .upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-area .icon { font-size: 36px; }
+
+        .progress-area { display: none; margin-top: 12px; }
+        .progress-bar-wrap { background: #eee; border-radius: 4px; overflow: hidden; height: 8px; margin: 8px 0; }
+        .progress-bar-inner { height: 100%; background: #2d6a9f; transition: width 0.3s; width: 0%; }
+
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .overlay.show { display: flex; }
+        .overlay-box { background: white; border-radius: 16px; padding: 36px 48px; text-align: center; min-width: 280px; }
+        .spinner { width: 48px; height: 48px; border: 4px solid #eee; border-top-color: #2d6a9f; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section">系统管理</div>
+        <a href="/admin.html" class="nav-item active"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">系统设置</div>
+
+        <div class="grid2">
+            <!-- 左列 -->
+            <div>
+                <!-- 队伍管理（仅管理员） -->
+                <div class="card superadmin-only">
+                    <h2>🏢 队伍管理</h2>
+
+                    <div style="display:flex;gap:10px;margin-bottom:16px">
+                        <input type="text" id="new-team-name" placeholder="队伍名称" style="flex:1">
+                        <input type="text" id="new-team-contact" placeholder="联系人（可选）" style="flex:1">
+                        <button class="btn btn-primary" onclick="createTeamNow()">添加</button>
+                    </div>
+
+                    <div id="team-list">
+                        <div style="text-align:center;padding:20px;color:#aaa">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 创建用户（仅管理员） -->
+                <div class="card superadmin-only">
+                    <h2>👤 创建账号</h2>
+
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="new-username" placeholder="输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="new-password" placeholder="输入密码（至少6位）">
+                    </div>
+                    <div class="form-group">
+                        <label>角色</label>
+                        <select id="new-role" onchange="toggleTeamSelect()">
+                            <option value="team_leader">队伍负责人</option>
+                            <option value="operator">操作员</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="user-team-group">
+                        <label>所属队伍</label>
+                        <select id="new-user-team">
+                            <option value="">-- 请选择队伍 --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="createUserNow()">创建账号</button>
+                </div>
+            </div>
+
+            <!-- 右列 -->
+            <div>
+                <!-- 用户列表（仅管理员） -->
+                <div class="card superadmin-only">
+                    <h2>👥 账号列表</h2>
+                    <div id="user-list">
+                        <div style="text-align:center;padding:20px;color:#aaa">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 银行联号库 -->
+                <div class="card">
+                    <h2>🏦 银行联号库管理</h2>
+
+                    <div class="bank-stats">
+                        <div>
+                            <div class="num" id="bank-total">-</div>
+                            <div class="lbl">当前联行号记录数</div>
+                        </div>
+                    </div>
+
+                    <p style="font-size:13px;color:#888;margin-bottom:12px">
+                        上传新的联号库Excel文件（<code>(银行联号)表格视图.xlsx</code>）将替换现有数据。
+                        文件较大，导入可能需要几分钟。
+                    </p>
+
+                    <div class="upload-area" id="bank-upload-area">
+                        <input type="file" id="bank-file" accept=".xlsx,.xls" onchange="importBankFile(this)">
+                        <div class="icon">🏦</div>
+                        <p style="margin-top:8px;font-size:14px;color:#666">点击上传联号库Excel文件</p>
+                        <p style="font-size:12px;color:#aaa;margin-top:4px">支持 .xlsx .xls 格式</p>
+                    </div>
+
+                    <div id="bank-import-status" style="margin-top:12px;font-size:13px"></div>
+
+                    <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-top:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <div style="font-size:13px;font-weight:600;color:#333;">🔎 工人银行信息核查</div>
+                            <button class="btn btn-primary btn-sm" id="check-workers-btn" onclick="checkWorkersRouting()">与联号库比对</button>
+                        </div>
+                        <p style="font-size:12px;color:#888;margin-bottom:10px;">检查所有工人的联行号和开户行名称是否与当前联号库一致。</p>
+                        <div id="worker-check-result"></div>
+                    </div>
+                </div>
+
+                <!-- 联行号查询 -->
+                <div class="card">
+                    <h2>🔍 联行号查询</h2>
+                    <div style="display:flex;gap:8px;margin-bottom:12px">
+                        <input type="text" id="routing-search" placeholder="输入联行号或银行名称" style="flex:1">
+                        <button class="btn btn-primary" onclick="searchRouting()">查询</button>
+                    </div>
+                    <div id="routing-result"></div>
+                </div>
+
+                <!-- 数据备份与恢复 -->
+                <div class="card">
+                    <h2>💾 数据备份与恢复</h2>
+                    <p style="font-size:13px;color:#888;margin-bottom:16px">
+                        备份包含所有工人信息、历史记录、核对报告。可在不同电脑之间迁移数据。
+                    </p>
+
+                    <div style="margin-bottom:20px;">
+                        <div style="font-size:13px;font-weight:600;color:#333;margin-bottom:8px;">📥 备份当前数据</div>
+                        <button class="btn btn-primary" onclick="doBackup()">下载备份文件</button>
+                        <div id="backup-status" style="margin-top:8px;font-size:13px;"></div>
+                    </div>
+
+                    <div style="border-top:1px solid #f0f0f0;padding-top:16px;">
+                        <div style="font-size:13px;font-weight:600;color:#333;margin-bottom:8px;">📤 恢复备份数据</div>
+                        <p style="font-size:12px;color:#dc3545;margin-bottom:10px;">
+                            ⚠️ 恢复操作会覆盖当前所有数据，请谨慎操作。
+                        </p>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="file" id="restore-file" accept=".zip" style="flex:1;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:4px;">
+                            <button class="btn btn-danger" onclick="doRestore()">开始恢复</button>
+                        </div>
+                        <div id="restore-status" style="margin-top:8px;font-size:13px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- 加载遮罩 -->
+<div class="overlay" id="overlay">
+    <div class="overlay-box">
+        <div class="spinner"></div>
+        <div id="overlay-text" style="font-size:15px;color:#333">导入中，请耐心等待...<br>15万条数据可能需要1-3分钟</div>
+    </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    if (!isAdminOrOperator()) {
+        showToast('此页面仅管理员或操作员可访问', 'error');
+        setTimeout(() => window.location.href = '/dashboard.html', 1500);
+    }
+
+    let teamsData = [];
+
+    async function init() {
+        await Promise.all([loadTeams(), loadUsers(), loadBankStats()]);
+    }
+
+    // ====== 队伍管理 ======
+
+    async function loadTeams() {
+        try {
+            teamsData = await getTeams() || [];
+
+            // 更新队伍列表
+            if (teamsData.length === 0) {
+                document.getElementById('team-list').innerHTML = '<div style="color:#aaa;font-size:13px">暂无队伍</div>';
+            } else {
+                const rows = teamsData.map(t => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5">
+                        <div>
+                            <strong>${t.name}</strong>
+                            <span style="font-size:12px;color:#888;margin-left:8px">${t.contact_person || ''}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="delTeam(${t.id}, '${t.name}')">删除</button>
+                    </div>
+                `).join('');
+                document.getElementById('team-list').innerHTML = rows;
+            }
+
+            // 更新创建用户的队伍下拉
+            const select = document.getElementById('new-user-team');
+            select.innerHTML = '<option value="">-- 请选择队伍 --</option>';
+            teamsData.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                select.appendChild(opt);
+            });
+
+        } catch(e) {
+            document.getElementById('team-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    async function createTeamNow() {
+        const name = document.getElementById('new-team-name').value.trim();
+        const contact = document.getElementById('new-team-contact').value.trim();
+        if (!name) { showToast('请输入队伍名称', 'warning'); return; }
+
+        try {
+            await createTeam(name, contact);
+            document.getElementById('new-team-name').value = '';
+            document.getElementById('new-team-contact').value = '';
+            await loadTeams();
+            showToast('队伍创建成功', 'success');
+        } catch(e) {
+            showToast('创建失败: ' + e.message, 'error');
+        }
+    }
+
+    async function delTeam(teamId, teamName) {
+        if (!confirm(`确认删除队伍"${teamName}"？该操作不可恢复。`)) return;
+        try {
+            await deleteTeam(teamId);
+            await loadTeams();
+            showToast('队伍已删除', 'success');
+        } catch(e) {
+            showToast('删除失败: ' + e.message, 'error');
+        }
+    }
+
+    // ====== 用户管理 ======
+
+    async function loadUsers() {
+        try {
+            const users = await api.get('/auth/users') || [];
+            const teamMap = {};
+            teamsData.forEach(t => teamMap[t.id] = t.name);
+
+            if (users.length === 0) {
+                document.getElementById('user-list').innerHTML = '<div style="color:#aaa;font-size:13px">暂无账号</div>';
+                return;
+            }
+
+            const rows = users.map(u => `
+                <tr>
+                    <td><strong>${u.username}</strong></td>
+                    <td>
+                        <span class="role-badge ${u.role === 'admin' ? 'role-admin' : u.role === 'operator' ? 'role-operator' : 'role-leader'}">
+                            ${u.role === 'admin' ? '管理员' : u.role === 'operator' ? '操作员' : '队伍负责人'}
+                        </span>
+                    </td>
+                    <td>${u.team_id ? (teamMap[u.team_id] || '#' + u.team_id) : '-'}</td>
+                    <td>${u.is_active ? '✅ 启用' : '❌ 禁用'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="disableUser(${u.id}, '${u.username}')">禁用</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('user-list').innerHTML = `
+                <table>
+                    <thead><tr><th>用户名</th><th>角色</th><th>队伍</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            document.getElementById('user-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    function toggleTeamSelect() {
+        const role = document.getElementById('new-role').value;
+        document.getElementById('user-team-group').style.display = role === 'team_leader' ? 'block' : 'none';
+    }
+
+    async function createUserNow() {
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value;
+        const role = document.getElementById('new-role').value;
+        const teamId = document.getElementById('new-user-team').value;
+
+        if (!username) { showToast('请输入用户名', 'warning'); return; }
+        if (!password || password.length < 6) { showToast('密码至少6位', 'warning'); return; }
+        if (role === 'team_leader' && !teamId) { showToast('请选择所属队伍', 'warning'); return; }
+
+        try {
+            await api.post('/auth/users', {
+                username, password, role,
+                team_id: teamId ? parseInt(teamId) : null,
+            });
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            await loadUsers();
+            showToast('账号创建成功', 'success');
+        } catch(e) {
+            showToast('创建失败: ' + e.message, 'error');
+        }
+    }
+
+    async function disableUser(userId, username) {
+        if (!confirm(`确认禁用账号"${username}"？`)) return;
+        try {
+            await api.delete(`/auth/users/${userId}`);
+            await loadUsers();
+            showToast('账号已禁用', 'success');
+        } catch(e) {
+            showToast('操作失败: ' + e.message, 'error');
+        }
+    }
+
+    // ====== 银行联号库 ======
+
+    async function loadBankStats() {
+        try {
+            const stats = await getBankRoutingStats();
+            const n = stats.total_records || 0;
+            document.getElementById('bank-total').textContent = n > 10000 ? (n/10000).toFixed(1) + ' 万' : n;
+        } catch(e) {}
+    }
+
+    async function importBankFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (!confirm(`确认导入"${file.name}"作为新的联行号库？将替换全部现有数据。`)) {
+            input.value = '';
+            return;
+        }
+
+        document.getElementById('overlay').classList.add('show');
+        document.getElementById('bank-import-status').textContent = '';
+
+        try {
+            const result = await importBankRouting(file);
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('bank-import-status').innerHTML =
+                `<span style="color:#28a745">✅ ${result.message}</span>`;
+            await loadBankStats();
+            showToast(result.message, 'success');
+
+            // 显示自动比对结果
+            if (result.worker_check) {
+                renderWorkerCheckResult(result.worker_check);
+            }
+        } catch(e) {
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('bank-import-status').innerHTML =
+                `<span style="color:#dc3545">❌ 导入失败: ${e.message}</span>`;
+            showToast('导入失败: ' + e.message, 'error');
+        }
+
+        input.value = '';
+    }
+
+    async function checkWorkersRouting() {
+        const btn = document.getElementById('check-workers-btn');
+        btn.disabled = true;
+        btn.textContent = '检查中...';
+        document.getElementById('worker-check-result').innerHTML =
+            '<div style="color:#888;font-size:13px">正在比对，请稍候...</div>';
+        try {
+            const token = getToken();
+            const resp = await fetch('/api/bank-routing/check-workers', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || '比对失败');
+            }
+            const result = await resp.json();
+            renderWorkerCheckResult(result);
+        } catch(e) {
+            document.getElementById('worker-check-result').innerHTML =
+                `<div style="color:#dc3545;font-size:13px">❌ ${e.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '与联号库比对';
+        }
+    }
+
+    function renderWorkerCheckResult(result) {
+        const { total_checked, ok_count, issue_count, issues } = result;
+        if (total_checked === 0) {
+            document.getElementById('worker-check-result').innerHTML =
+                '<div style="color:#888;font-size:13px">暂无需要比对的工人记录（联号库为空或工人无联行号）</div>';
+            return;
+        }
+
+        let html = `
+            <div style="display:flex;gap:16px;padding:12px;background:#f8f9fa;border-radius:8px;margin-bottom:10px;font-size:13px">
+                <div><strong>${total_checked}</strong> <span style="color:#888">共检查</span></div>
+                <div style="color:#28a745"><strong>${ok_count}</strong> 条正常</div>
+                <div style="color:${issue_count > 0 ? '#dc3545' : '#28a745'}"><strong>${issue_count}</strong> 条异常</div>
+            </div>
+        `;
+
+        if (issue_count === 0) {
+            html += '<div style="color:#28a745;font-size:13px">✅ 所有工人银行信息与联号库一致</div>';
+        } else {
+            const rows = issues.map(i => `
+                <tr>
+                    <td>${i.worker_name}</td>
+                    <td style="font-family:monospace;font-size:12px">${i.id_card ? i.id_card.replace(/(.{6}).*(.{4})/, '$1****$2') : '-'}</td>
+                    <td style="font-family:monospace">${i.routing_number || '-'}</td>
+                    <td style="color:${i.issue_type === 'routing_not_found' ? '#dc3545' : '#e67e22'}">${i.issue_desc}</td>
+                </tr>
+            `).join('');
+            html += `
+                <div style="font-size:12px;color:#dc3545;margin-bottom:6px">⚠️ 发现 ${issue_count} 条异常，请核实：</div>
+                <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+                    <table>
+                        <thead><tr><th>姓名</th><th>身份证</th><th>联行号</th><th>问题描述</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        document.getElementById('worker-check-result').innerHTML = html;
+    }
+
+    async function searchRouting() {
+        const q = document.getElementById('routing-search').value.trim();
+        if (!q) { showToast('请输入查询内容', 'warning'); return; }
+
+        try {
+            const result = await searchBankRouting(q, 20);
+            const items = result.items || [];
+
+            if (items.length === 0) {
+                document.getElementById('routing-result').innerHTML =
+                    '<div style="color:#888;font-size:13px;text-align:center;padding:20px">未找到匹配记录</div>';
+                return;
+            }
+
+            const rows = items.map(r => `
+                <tr>
+                    <td style="font-family:monospace">${r.routing_number}</td>
+                    <td>${r.branch_name || '-'}</td>
+                    <td>${r.province || ''}${r.city || ''}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('routing-result').innerHTML = `
+                <div style="font-size:12px;color:#888;margin-bottom:6px">找到 ${result.total} 条（显示前20条）</div>
+                <table>
+                    <thead><tr><th>联行号</th><th>银行名称</th><th>省市</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            showToast('查询失败: ' + e.message, 'error');
+        }
+    }
+
+    document.getElementById('routing-search').addEventListener('keypress', e => {
+        if (e.key === 'Enter') searchRouting();
+    });
+
+    // ==================== 备份与恢复 ====================
+
+    async function doBackup() {
+        const btn = event.target;
+        btn.disabled = true;
+        document.getElementById('backup-status').textContent = '正在生成备份...';
+        try {
+            const token = getToken();
+            const response = await fetch('/api/backup/download', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '备份失败');
+            }
+            const blob = await response.blob();
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename="(.+?)"/);
+            const filename = match ? match[1] : 'payclear_backup.zip';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            document.getElementById('backup-status').innerHTML = '<span style="color:#28a745">✅ 备份文件已下载</span>';
+        } catch(e) {
+            document.getElementById('backup-status').innerHTML = `<span style="color:#dc3545">❌ ${e.message}</span>`;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function doRestore() {
+        const fileInput = document.getElementById('restore-file');
+        if (!fileInput.files[0]) {
+            showToast('请先选择备份文件', 'warning');
+            return;
+        }
+
+        if (!confirm('⚠️ 恢复操作会覆盖当前所有数据，确定要继续吗？')) return;
+
+        const btn = event.target;
+        btn.disabled = true;
+        document.getElementById('restore-status').textContent = '正在恢复...';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            const result = await api.postForm('/backup/restore', formData);
+
+            document.getElementById('restore-status').innerHTML =
+                `<span style="color:#28a745">✅ 恢复成功！备份时间：${result.backup_time || '未知'}，备份人：${result.created_by || '未知'}</span>`;
+            showToast('数据恢复成功，请刷新页面', 'success');
+            setTimeout(() => window.location.reload(), 2000);
+        } catch(e) {
+            document.getElementById('restore-status').innerHTML = `<span style="color:#dc3545">❌ ${e.message}</span>`;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

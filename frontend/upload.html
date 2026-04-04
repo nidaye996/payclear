@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传表格 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
+            color: white;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        /* 步骤指示器 */
+        .steps {
+            display: flex;
+            align-items: center;
+            margin-bottom: 32px;
+            background: white;
+            padding: 20px 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .step-num {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px; flex-shrink: 0;
+        }
+
+        .step.active .step-num { background: #2d6a9f; }
+        .step.done .step-num { background: #28a745; }
+
+        .step-text { font-size: 13px; color: #888; }
+        .step.active .step-text { color: #2d6a9f; font-weight: 600; }
+        .step.done .step-text { color: #28a745; }
+
+        .step-line { flex: 1; height: 2px; background: #e0e0e0; margin: 0 8px; }
+        .step-line.done { background: #28a745; }
+
+        /* 卡片 */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* 表单 */
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+
+        select, input[type="number"] {
+            width: 100%; padding: 10px 12px;
+            border: 1px solid #ddd; border-radius: 6px;
+            font-size: 14px; outline: none; transition: border-color 0.2s;
+            background: white;
+        }
+
+        select:focus, input:focus { border-color: #2d6a9f; }
+
+        /* 文件上传区域 */
+        .file-upload-area {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .file-box {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .file-box:hover { border-color: #2d6a9f; background: #f8fbff; }
+        .file-box.has-file { border-color: #28a745; background: #f0fff4; border-style: solid; }
+        .file-box.uploading { border-color: #2d6a9f; background: #f8fbff; }
+        .file-box.error { border-color: #dc3545; background: #fff5f5; border-style: solid; }
+
+        .file-box input[type="file"] {
+            position: absolute; inset: 0;
+            opacity: 0; cursor: pointer;
+            width: 100%; height: 100%;
+        }
+
+        .file-icon { font-size: 36px; margin-bottom: 8px; }
+        .file-type-label { font-weight: 600; color: #333; margin-bottom: 4px; font-size: 14px; }
+        .file-desc { font-size: 12px; color: #888; margin-bottom: 10px; }
+        .file-status { font-size: 12px; margin-top: 8px; }
+        .file-status.success { color: #28a745; }
+        .file-status.error { color: #dc3545; }
+        .file-status.pending { color: #888; }
+
+        /* 按钮 */
+        .btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-danger { background: #dc3545; color: white; }
+
+        /* 核对结果 */
+        .check-result {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .result-item {
+            background: white;
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .result-item .num { font-size: 28px; font-weight: 700; }
+        .result-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .result-item.error .num { color: #dc3545; }
+        .result-item.warning .num { color: #e67e22; }
+        .result-item.ok .num { color: #28a745; }
+
+        .btn-group { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+        /* 进度遮罩 */
+        .overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+
+        .overlay.show { display: flex; }
+
+        .overlay-box {
+            background: white;
+            border-radius: 16px;
+            padding: 36px 48px;
+            text-align: center;
+            min-width: 280px;
+        }
+
+        .spinner {
+            width: 48px; height: 48px;
+            border: 4px solid #eee;
+            border-top-color: #2d6a9f;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .submission-info {
+            background: #e8f0fe;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #2d6a9f;
+            margin-bottom: 16px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item active"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section admin-only">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">上传月度表格</div>
+
+        <!-- 步骤 -->
+        <div class="steps">
+            <div class="step active" id="step1">
+                <div class="step-num">1</div>
+                <div class="step-text">选择队伍和月份</div>
+            </div>
+            <div class="step-line" id="line1"></div>
+            <div class="step" id="step2">
+                <div class="step-num">2</div>
+                <div class="step-text">上传表格文件</div>
+            </div>
+            <div class="step-line" id="line2"></div>
+            <div class="step" id="step3">
+                <div class="step-num">3</div>
+                <div class="step-text">执行核对</div>
+            </div>
+        </div>
+
+        <!-- 第1步：选择队伍月份 -->
+        <div class="card" id="card-step1">
+            <h2>第一步：选择队伍和月份</h2>
+
+            <div class="submission-info" id="existing-submission-info"></div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>分包队伍 *</label>
+                    <select id="team-select">
+                        <option value="">-- 请选择队伍 --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>年份 *</label>
+                    <input type="number" id="year-input" min="2020" max="2030" value="2025">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>月份 *</label>
+                    <select id="month-select">
+                        <option value="1">1月</option><option value="2">2月</option>
+                        <option value="3">3月</option><option value="4">4月</option>
+                        <option value="5">5月</option><option value="6">6月</option>
+                        <option value="7">7月</option><option value="8">8月</option>
+                        <option value="9">9月</option><option value="10">10月</option>
+                        <option value="11">11月</option><option value="12">12月</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-create-submission" onclick="createOrSelectSubmission()">
+                下一步 →
+            </button>
+        </div>
+
+        <!-- 第2步：上传文件 -->
+        <div class="card" id="card-step2" style="display:none">
+            <h2>第二步：上传表格文件</h2>
+            <p style="font-size:13px;color:#888;margin-bottom:20px">
+                支持 Word (.docx) 和 Excel (.xlsx) 格式，系统会自动识别字段，无需固定列名
+            </p>
+
+            <div class="file-upload-area">
+                <!-- 实名制表 -->
+                <div class="file-box" id="box-registry">
+                    <input type="file" id="file-registry" accept=".docx,.xlsx" onchange="handleFileChange('registry', this)">
+                    <div class="file-icon">📋</div>
+                    <div class="file-type-label">实名制工资信息报审表</div>
+                    <div class="file-desc">Word格式，含工人花名册<br>（姓名、身份证、银行卡、联行号）</div>
+                    <div class="file-status pending" id="status-registry">点击或拖拽上传文件</div>
+                </div>
+
+                <!-- 工资表 -->
+                <div class="file-box" id="box-salary">
+                    <input type="file" id="file-salary" accept=".docx,.xlsx" onchange="handleFileChange('salary', this)">
+                    <div class="file-icon">💰</div>
+                    <div class="file-type-label">农民工工资支付表</div>
+                    <div class="file-desc">Word格式，含月度工资<br>（姓名、身份证、银行卡、实发工资）</div>
+                    <div class="file-status pending" id="status-salary">点击或拖拽上传文件</div>
+                </div>
+
+                <!-- 支付明细 -->
+                <div class="file-box" id="box-payment">
+                    <input type="file" id="file-payment" accept=".xlsx,.xls" onchange="handleFileChange('payment', this)">
+                    <div class="file-icon">🏦</div>
+                    <div class="file-type-label">银行支付明细</div>
+                    <div class="file-desc">Excel格式（非必须）<br>（收款方名称、账号、联行号、金额）</div>
+                    <div class="file-status pending" id="status-payment">点击或拖拽上传文件（可选）</div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btn-run-check" onclick="runCheckNow()" disabled>
+                    🔍 开始核对
+                </button>
+                <button class="btn" style="background:#f0f0f0;color:#444" onclick="goBack()">
+                    ← 重新选择
+                </button>
+            </div>
+
+            <!-- 核对结果 -->
+            <div class="check-result" id="check-result">
+                <h3 style="margin-bottom:12px;font-size:15px">核对结果</h3>
+                <div class="result-summary">
+                    <div class="result-item ok">
+                        <div class="num" id="res-workers">-</div>
+                        <div class="label">涉及工人数</div>
+                    </div>
+                    <div class="result-item error">
+                        <div class="num" id="res-errors">-</div>
+                        <div class="label">错误项</div>
+                    </div>
+                    <div class="result-item warning">
+                        <div class="num" id="res-warnings">-</div>
+                        <div class="label">警告项</div>
+                    </div>
+                </div>
+
+                <div id="report-link" style="display:none">
+                    <a href="#" id="view-report-link" style="color:#2d6a9f;font-weight:600">📊 查看详细报告</a>
+                    &nbsp;&nbsp;
+                    <a href="#" id="export-report-link" style="color:#28a745;font-weight:600">📥 导出Excel报告</a>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- 加载遮罩 -->
+<div class="overlay" id="overlay">
+    <div class="overlay-box">
+        <div class="spinner"></div>
+        <div id="overlay-text" style="font-size:15px;color:#333">处理中，请稍候...</div>
+    </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    let currentSubmissionId = null;
+    let uploadedFiles = { registry: false, salary: false, payment: false };
+    let lastReportId = null;
+
+    // 初始化
+    async function init() {
+        // 设置当前月份
+        const now = new Date();
+        document.getElementById('year-input').value = now.getFullYear();
+        document.getElementById('month-select').value = now.getMonth() + 1;
+
+        // 加载队伍列表
+        try {
+            const teams = await getTeams();
+            const select = document.getElementById('team-select');
+            (teams || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                select.appendChild(opt);
+            });
+
+            // 非管理员自动选中自己的队伍
+            const userInfo = getUserInfo();
+            if (userInfo && userInfo.team_id) {
+                select.value = userInfo.team_id;
+                select.disabled = true;
+            }
+        } catch(e) {
+            showToast('加载队伍列表失败: ' + e.message, 'error');
+        }
+
+        // 检查URL参数（从其他页面跳转带submission_id）
+        const params = new URLSearchParams(window.location.search);
+        const subId = params.get('submission_id');
+        if (subId) {
+            currentSubmissionId = parseInt(subId);
+            showStep2();
+        }
+    }
+
+    async function createOrSelectSubmission() {
+        const teamId = document.getElementById('team-select').value;
+        const year = parseInt(document.getElementById('year-input').value);
+        const month = parseInt(document.getElementById('month-select').value);
+
+        if (!teamId) { showToast('请选择队伍', 'warning'); return; }
+        if (!year || !month) { showToast('请选择年份和月份', 'warning'); return; }
+
+        showOverlay('创建提交记录...');
+        try {
+            const result = await createSubmission(teamId, year, month, false);
+            currentSubmissionId = result.id;
+            hideOverlay();
+            showStep2();
+        } catch(e) {
+            hideOverlay();
+            // 如果已存在，尝试从现有记录中找
+            if (e.message.includes('已有提交记录')) {
+                showToast(e.message, 'warning');
+                // 提取ID
+                const match = e.message.match(/ID: (\d+)/);
+                if (match) {
+                    currentSubmissionId = parseInt(match[1]);
+                    showStep2();
+                }
+            } else {
+                showToast('创建失败: ' + e.message, 'error');
+            }
+        }
+    }
+
+    function showStep2() {
+        document.getElementById('card-step1').style.display = 'none';
+        document.getElementById('card-step2').style.display = 'block';
+        document.getElementById('step1').classList.add('done');
+        document.getElementById('step2').classList.add('active');
+        document.getElementById('line1').classList.add('done');
+    }
+
+    function goBack() {
+        document.getElementById('card-step1').style.display = 'block';
+        document.getElementById('card-step2').style.display = 'none';
+        document.getElementById('step1').classList.remove('done');
+        document.getElementById('step2').classList.remove('active');
+        document.getElementById('line1').classList.remove('done');
+        document.getElementById('check-result').style.display = 'none';
+        currentSubmissionId = null;
+        uploadedFiles = { registry: false, salary: false, payment: false };
+    }
+
+    async function handleFileChange(fileKey, input) {
+        if (!input.files[0]) return;
+        if (!currentSubmissionId) { showToast('请先创建提交记录', 'warning'); return; }
+
+        const file = input.files[0];
+        const fileTypeMap = {
+            registry: '实名制表',
+            salary: '工资表',
+            payment: '支付明细',
+        };
+        const fileType = fileTypeMap[fileKey];
+
+        const box = document.getElementById('box-' + fileKey);
+        const status = document.getElementById('status-' + fileKey);
+
+        box.classList.add('uploading');
+        status.className = 'file-status pending';
+        status.textContent = '上传解析中...';
+
+        try {
+            const result = await uploadFile(currentSubmissionId, fileType, file);
+
+            if (result.parse_status === 'done') {
+                box.classList.remove('uploading');
+                box.classList.add('has-file');
+                status.className = 'file-status success';
+                status.textContent = `✓ 识别到 ${result.workers_found} 名工人`;
+                uploadedFiles[fileKey] = true;
+            } else {
+                box.classList.remove('uploading');
+                box.classList.add('error');
+                status.className = 'file-status error';
+                status.textContent = '解析失败: ' + (result.error || '未知错误');
+            }
+
+            // 有任意文件上传成功则启用核对按钮
+            const anyUploaded = Object.values(uploadedFiles).some(v => v);
+            document.getElementById('btn-run-check').disabled = !anyUploaded;
+
+        } catch(e) {
+            box.classList.remove('uploading');
+            box.classList.add('error');
+            status.className = 'file-status error';
+            status.textContent = '上传失败: ' + e.message;
+        }
+    }
+
+    async function runCheckNow() {
+        if (!currentSubmissionId) { showToast('请先上传文件', 'warning'); return; }
+
+        showOverlay('核对中，请稍候...\n（联号库核对可能需要几秒钟）');
+        try {
+            const result = await runCheck(currentSubmissionId);
+            hideOverlay();
+
+            // 显示结果
+            document.getElementById('res-workers').textContent = result.total_workers;
+            document.getElementById('res-errors').textContent = result.error_count;
+            document.getElementById('res-warnings').textContent = result.warning_count;
+            document.getElementById('check-result').style.display = 'block';
+
+            // 步骤更新
+            document.getElementById('step2').classList.add('done');
+            document.getElementById('step3').classList.add('active');
+            document.getElementById('line2').classList.add('done');
+
+            // 报告链接（需要查询报告ID）
+            try {
+                const reports = await getReports({ });
+                const myReport = reports.find(r => r.submission_id === currentSubmissionId);
+                if (myReport) {
+                    lastReportId = myReport.id;
+                    const viewLink = document.getElementById('view-report-link');
+                    const exportLink = document.getElementById('export-report-link');
+                    viewLink.href = `/report.html?id=${myReport.id}`;
+                    viewLink.target = '_blank';
+                    exportLink.onclick = (e) => {
+                        e.preventDefault();
+                        exportReport(myReport.id).catch(err => showToast('导出失败: ' + err.message, 'error'));
+                    };
+                    document.getElementById('report-link').style.display = 'block';
+
+                    // 显示入库按钮
+                    if (isAdmin()) {
+                        document.getElementById('admin-confirm-area').style.display = 'block';
+                    }
+                }
+            } catch(e) {}
+
+            if (result.error_count === 0 && result.warning_count === 0) {
+                showToast(`核对完成！${result.total_workers}名工人，无异常`, 'success');
+            } else {
+                showToast(`核对完成，发现 ${result.error_count} 个错误，${result.warning_count} 个警告`, 'warning');
+            }
+
+        } catch(e) {
+            hideOverlay();
+            showToast('核对失败: ' + e.message, 'error');
+        }
+    }
+
+    function showOverlay(text) {
+        document.getElementById('overlay-text').textContent = text;
+        document.getElementById('overlay').classList.add('show');
+    }
+
+    function hideOverlay() {
+        document.getElementById('overlay').classList.remove('show');
+    }
+
+    init();
+</script>
+</body>
+</html>

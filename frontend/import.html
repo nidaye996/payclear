@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史数据导入 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; max-width: 960px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 8px; }
+        .page-desc { color: #888; font-size: 14px; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card-title { font-size: 16px; color: #333; font-weight: 600; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+        select, input[type="number"] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; background: white; }
+        select:focus, input:focus { border-color: #2d6a9f; }
+
+        .upload-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin-bottom: 10px; padding: 14px 16px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; }
+        .upload-row.receipt { background: #fff8e1; border-color: #ffe082; }
+        .upload-label { font-size: 13px; color: #444; font-weight: 600; margin-bottom: 4px; }
+        .upload-hint { font-size: 11px; color: #888; }
+        input[type="file"] { font-size: 12px; }
+
+        .btn { padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-success:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-outline { background: white; color: #2d6a9f; border: 1px solid #2d6a9f; }
+        .btn-outline:hover { background: #f0f5ff; }
+
+        .tip-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #856404; }
+
+        /* 摘要横幅 */
+        .summary-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .summary-item { padding: 14px 16px; border-radius: 8px; text-align: center; }
+        .summary-item .num { font-size: 28px; font-weight: 700; line-height: 1; }
+        .summary-item .label { font-size: 12px; margin-top: 4px; }
+        .s-total   { background: #e8f0fe; color: #1a3a5c; }
+        .s-success { background: #d4edda; color: #155724; }
+        .s-failed  { background: #f8d7da; color: #721c24; }
+        .s-warn    { background: #fff3cd; color: #856404; }
+
+        /* 三表核对问题 */
+        .issues-toggle { cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #fff3cd; border-radius: 8px; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: #856404; user-select: none; }
+        .issues-toggle .arrow { transition: transform 0.2s; }
+        .issues-toggle.open .arrow { transform: rotate(180deg); }
+        .issues-list { display: none; max-height: 300px; overflow-y: auto; margin-bottom: 12px; }
+        .issues-list.show { display: block; }
+        .issue-item { padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
+        .issue-error { background: #f8d7da; color: #721c24; }
+        .issue-warn  { background: #fff3cd; color: #856404; }
+
+        /* 工人表格 */
+        .worker-table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f5f7fa; padding: 10px 12px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+        tr.disabled td { opacity: 0.5; }
+
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-failed  { background: #f8d7da; color: #721c24; }
+        .badge-warn    { background: #fff3cd; color: #856404; }
+        .badge-grey    { background: #e9ecef; color: #6c757d; }
+
+        /* 确认导入区 */
+        .confirm-bar { position: sticky; bottom: 0; background: white; border-top: 2px solid #e0e0e0; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -2px 8px rgba(0,0,0,0.06); }
+        .confirm-info { font-size: 14px; color: #555; }
+        .confirm-info strong { color: #2d6a9f; font-size: 18px; }
+
+        /* 导入结果 */
+        .result-success { background: #d4edda; color: #155724; padding: 16px 20px; border-radius: 8px; font-size: 14px; }
+        .result-error   { background: #f8d7da; color: #721c24; padding: 16px 20px; border-radius: 8px; font-size: 14px; }
+
+        /* 加载遮罩 */
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .overlay.show { display: flex; }
+        .overlay-box { background: white; border-radius: 16px; padding: 36px 48px; text-align: center; min-width: 280px; }
+        .spinner { width: 48px; height: 48px; border: 4px solid #eee; border-top-color: #2d6a9f; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #phase-result { display: none; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item active"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section">系统管理</div>
+        <a href="/admin.html" class="nav-item"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">历史数据导入</div>
+        <div class="page-desc">上传三张表 + 打款回执，系统核对后由管理员确认入库</div>
+
+        <!-- ===== 第一阶段：上传表单 ===== -->
+        <div id="phase-upload">
+            <div class="tip-box">
+                <strong>⚠️ 操作说明</strong>
+                先上传三张表格和打款回执PDF，系统会核对三表一致性并与回执比对。
+                核对完成后，您再决定哪些工人入正式库。
+            </div>
+
+            <div class="card">
+                <div class="card-title">📅 选择月份与队伍</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>分包队伍 *</label>
+                        <select id="team-select"><option value="">-- 请选择队伍 --</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>年份 *</label>
+                        <input type="number" id="year-input" min="2020" max="2030" value="2024">
+                    </div>
+                    <div class="form-group">
+                        <label>月份 *</label>
+                        <select id="month-select">
+                            <option value="1">1月</option><option value="2">2月</option>
+                            <option value="3">3月</option><option value="4">4月</option>
+                            <option value="5">5月</option><option value="6">6月</option>
+                            <option value="7">7月</option><option value="8">8月</option>
+                            <option value="9">9月</option><option value="10">10月</option>
+                            <option value="11">11月</option><option value="12">12月</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📋 上传三张表</div>
+
+                <div class="upload-row">
+                    <div>
+                        <div class="upload-label">📋 实名制工资信息报审表（必填）</div>
+                        <div class="upload-hint">Word 或 Excel 格式，含姓名、身份证、银行卡等信息</div>
+                    </div>
+                    <input type="file" id="file0" accept=".docx,.xlsx,.xls">
+                </div>
+
+                <div class="upload-row">
+                    <div>
+                        <div class="upload-label">💰 农民工工资支付表（可选）</div>
+                        <div class="upload-hint">Word 格式，含实发工资</div>
+                    </div>
+                    <input type="file" id="file1" accept=".docx,.xlsx,.xls">
+                </div>
+
+                <div class="upload-row">
+                    <div>
+                        <div class="upload-label">🏦 银行支付明细（可选）</div>
+                        <div class="upload-hint">Excel 格式，含收款账号、联行号</div>
+                    </div>
+                    <input type="file" id="file2" accept=".xlsx,.xls">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📄 上传打款回执</div>
+                <div class="upload-row receipt">
+                    <div>
+                        <div class="upload-label">🧾 打款回执单 PDF（必填）</div>
+                        <div class="upload-hint">格式：序号 对方账号 对方户名 交易金额 状态（成功/失败）</div>
+                    </div>
+                    <input type="file" id="receipt-file" accept=".pdf">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-analyze" onclick="doAnalyze()">🔍 开始分析</button>
+        </div>
+
+        <!-- ===== 第二阶段：分析结果 ===== -->
+        <div id="phase-result">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div>
+                    <span style="font-size:16px; font-weight:600; color:#1a3a5c;" id="result-period"></span>
+                    <span style="font-size:13px; color:#888; margin-left:12px;">回执共 <span id="receipt-total">0</span> 笔记录</span>
+                </div>
+                <button class="btn btn-outline" onclick="resetForm()">← 重新上传</button>
+            </div>
+
+            <!-- 摘要 -->
+            <div class="summary-banner">
+                <div class="summary-item s-total">
+                    <div class="num" id="sum-total">0</div>
+                    <div class="label">工人总数</div>
+                </div>
+                <div class="summary-item s-success">
+                    <div class="num" id="sum-success">0</div>
+                    <div class="label">✅ 打款成功</div>
+                </div>
+                <div class="summary-item s-failed">
+                    <div class="num" id="sum-failed">0</div>
+                    <div class="label">❌ 打款失败</div>
+                </div>
+                <div class="summary-item s-warn">
+                    <div class="num" id="sum-warn">0</div>
+                    <div class="label">⚠️ 未找到回执</div>
+                </div>
+            </div>
+
+            <!-- 三表核对问题 -->
+            <div id="cross-issues-section" style="display:none; margin-bottom:16px;">
+                <div class="issues-toggle" id="issues-toggle" onclick="toggleIssues()">
+                    <span>⚠️ 三表核对发现问题 (<span id="issues-count">0</span> 条)</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="issues-list" id="issues-list"></div>
+            </div>
+
+            <!-- 工人列表 -->
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:16px 20px; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="font-size:15px; font-weight:600;">工人入库状态</div>
+                    <div style="font-size:13px; color:#888;">
+                        <label style="cursor:pointer; margin-right:12px;">
+                            <input type="checkbox" id="chk-all" onchange="toggleAll(this.checked)" style="margin-right:4px;">
+                            全选可导入
+                        </label>
+                    </div>
+                </div>
+                <div class="worker-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40px;">导入</th>
+                                <th>姓名</th>
+                                <th>身份证</th>
+                                <th>银行卡号</th>
+                                <th>回执状态</th>
+                                <th>打款金额</th>
+                            </tr>
+                        </thead>
+                        <tbody id="worker-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 导入结果（成功后显示） -->
+            <div id="import-result" style="margin-top:16px; display:none;"></div>
+
+            <!-- 粘性底部确认栏 -->
+            <div class="confirm-bar" id="confirm-bar">
+                <div class="confirm-info">
+                    已选择 <strong id="selected-count">0</strong> 名工人导入正式库
+                </div>
+                <button class="btn btn-success" id="btn-confirm" onclick="doConfirm()">✅ 确认导入</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- 加载遮罩 -->
+<div class="overlay" id="overlay">
+    <div class="overlay-box">
+        <div class="spinner"></div>
+        <div id="overlay-text" style="font-size:15px;color:#333">处理中，请稍候...</div>
+    </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    if (!isAdminOrOperator()) {
+        showToast('此页面仅管理员或操作员可访问', 'error');
+        setTimeout(() => window.location.href = '/dashboard.html', 1500);
+    }
+
+    let currentSubmissionId = null;
+    let workersData = [];
+
+    async function init() {
+        try {
+            const teams = await getTeams();
+            const sel = document.getElementById('team-select');
+            (teams || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                sel.appendChild(opt);
+            });
+        } catch(e) {
+            showToast('加载队伍失败', 'error');
+        }
+    }
+
+    async function doAnalyze() {
+        const teamId = document.getElementById('team-select').value;
+        const year   = parseInt(document.getElementById('year-input').value);
+        const month  = parseInt(document.getElementById('month-select').value);
+
+        if (!teamId) { showToast('请选择队伍', 'warning'); return; }
+        if (!year)   { showToast('请填写年份', 'warning'); return; }
+
+        const file0 = document.getElementById('file0').files[0];
+        if (!file0) { showToast('实名制表为必填', 'warning'); return; }
+
+        const receiptFile = document.getElementById('receipt-file').files[0];
+        if (!receiptFile) { showToast('回执单PDF为必填', 'warning'); return; }
+
+        const fileTypes = ['实名制表', '工资表', '支付明细'];
+        const filesInfo = [];
+        for (let i = 0; i < 3; i++) {
+            const f = document.getElementById('file' + i).files[0];
+            if (f) filesInfo.push({ file: f, type: fileTypes[i] });
+        }
+
+        showOverlay('正在解析文件和回执，请耐心等待...');
+        document.getElementById('btn-analyze').disabled = true;
+
+        try {
+            const result = await analyzeHistorical(teamId, year, month, filesInfo, receiptFile);
+            hideOverlay();
+            renderResult(result);
+        } catch(e) {
+            hideOverlay();
+            document.getElementById('btn-analyze').disabled = false;
+            showToast('分析失败: ' + e.message, 'error');
+        }
+    }
+
+    function renderResult(result) {
+        currentSubmissionId = result.submission_id;
+        workersData = result.workers || [];
+
+        // 切换阶段
+        document.getElementById('phase-upload').style.display = 'none';
+        document.getElementById('phase-result').style.display = 'block';
+        document.getElementById('import-result').style.display = 'none';
+        document.getElementById('btn-confirm').disabled = false;
+
+        // 标题
+        document.getElementById('result-period').textContent = result.period + ' 导入分析';
+        document.getElementById('receipt-total').textContent = result.receipt_total || 0;
+
+        // 摘要
+        const s = result.summary;
+        document.getElementById('sum-total').textContent   = s.total;
+        document.getElementById('sum-success').textContent = s.receipt_success;
+        document.getElementById('sum-failed').textContent  = s.receipt_failed;
+        document.getElementById('sum-warn').textContent    = (s.not_in_receipt || 0) + (s.no_card || 0);
+
+        // 三表核对问题
+        const issues = result.cross_issues || [];
+        if (issues.length > 0) {
+            document.getElementById('cross-issues-section').style.display = 'block';
+            document.getElementById('issues-count').textContent = issues.length;
+            const list = document.getElementById('issues-list');
+            list.innerHTML = issues.map(iss => `
+                <div class="issue-item ${iss.severity === 'error' ? 'issue-error' : 'issue-warn'}">
+                    <strong>${iss.worker_name}</strong>（${maskIdCard(iss.id_card)}）
+                    ${iss.field}：${iss.description}
+                </div>
+            `).join('');
+        } else {
+            document.getElementById('cross-issues-section').style.display = 'none';
+        }
+
+        // 工人表格
+        renderWorkerTable();
+        updateSelectedCount();
+    }
+
+    function renderWorkerTable() {
+        const tbody = document.getElementById('worker-tbody');
+        const statusMap = {
+            success:   { badge: 'badge-success', label: '✅ 打款成功' },
+            failed:    { badge: 'badge-failed',  label: '❌ 打款失败' },
+            not_found: { badge: 'badge-warn',    label: '⚠️ 未在回执中' },
+            no_card:   { badge: 'badge-grey',    label: '⚠️ 无银行卡' },
+        };
+
+        tbody.innerHTML = workersData.map((w, idx) => {
+            const st       = statusMap[w.receipt_status] || statusMap.no_card;
+            const disabled = w.receipt_status === 'failed';
+            const checked  = w.default_approved ? 'checked' : '';
+            const disabledAttr = disabled ? 'disabled' : '';
+            const rowClass = disabled ? 'disabled' : '';
+            const amount   = w.receipt_amount != null ? '¥' + w.receipt_amount.toLocaleString('zh-CN') : '-';
+
+            return `
+                <tr class="${rowClass}" id="row-${idx}">
+                    <td>
+                        <input type="checkbox" class="worker-chk" data-idx="${idx}"
+                            ${checked} ${disabledAttr}
+                            onchange="updateSelectedCount()">
+                    </td>
+                    <td><strong>${w.name}</strong></td>
+                    <td style="font-size:12px;color:#888;">${maskIdCard(w.id_card)}</td>
+                    <td style="font-family:monospace;font-size:12px;">${w.bank_card || '-'}</td>
+                    <td><span class="badge ${st.badge}">${st.label}</span></td>
+                    <td>${amount}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function updateSelectedCount() {
+        const checked = document.querySelectorAll('.worker-chk:checked').length;
+        document.getElementById('selected-count').textContent = checked;
+        document.getElementById('btn-confirm').disabled = checked === 0;
+
+        // 同步全选框状态
+        const all = document.querySelectorAll('.worker-chk:not(:disabled)').length;
+        const allChk = document.getElementById('chk-all');
+        allChk.checked = all > 0 && checked === all;
+        allChk.indeterminate = checked > 0 && checked < all;
+    }
+
+    function toggleAll(checked) {
+        document.querySelectorAll('.worker-chk:not(:disabled)').forEach(chk => {
+            chk.checked = checked;
+        });
+        updateSelectedCount();
+    }
+
+    function toggleIssues() {
+        const toggle = document.getElementById('issues-toggle');
+        const list   = document.getElementById('issues-list');
+        toggle.classList.toggle('open');
+        list.classList.toggle('show');
+    }
+
+    async function doConfirm() {
+        const checked = document.querySelectorAll('.worker-chk:checked');
+        const approvedIdCards = [];
+        checked.forEach(chk => {
+            const idx = parseInt(chk.dataset.idx);
+            approvedIdCards.push(workersData[idx].id_card);
+        });
+
+        if (approvedIdCards.length === 0) {
+            showToast('请至少选择一名工人', 'warning');
+            return;
+        }
+
+        showOverlay(`正在导入 ${approvedIdCards.length} 名工人...`);
+        document.getElementById('btn-confirm').disabled = true;
+
+        try {
+            const result = await confirmHistorical(currentSubmissionId, approvedIdCards);
+            hideOverlay();
+
+            const resultDiv = document.getElementById('import-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="result-success">
+                    ✅ 导入成功！新增 <strong>${result.created}</strong> 名工人，
+                    更新 <strong>${result.updated}</strong> 名工人，
+                    共 <strong>${result.total}</strong> 人入正式库（${result.period}）。
+                </div>
+            `;
+
+            // 隐藏确认栏，禁用勾选
+            document.getElementById('confirm-bar').style.display = 'none';
+            document.querySelectorAll('.worker-chk').forEach(chk => chk.disabled = true);
+            showToast('导入完成', 'success');
+
+        } catch(e) {
+            hideOverlay();
+            document.getElementById('btn-confirm').disabled = false;
+            const resultDiv = document.getElementById('import-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `<div class="result-error">❌ 导入失败: ${e.message}</div>`;
+            showToast('导入失败: ' + e.message, 'error');
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('phase-upload').style.display = 'block';
+        document.getElementById('phase-result').style.display = 'none';
+        document.getElementById('confirm-bar').style.display = 'flex';
+        document.getElementById('btn-analyze').disabled = false;
+        currentSubmissionId = null;
+        workersData = [];
+    }
+
+    function showOverlay(text) {
+        document.getElementById('overlay-text').textContent = text;
+        document.getElementById('overlay').classList.add('show');
+    }
+
+    function hideOverlay() {
+        document.getElementById('overlay').classList.remove('show');
+    }
+
+    init();
+</script>
+</body>
+</html>

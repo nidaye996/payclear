@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工作台 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        /* 顶部导航 */
+        .navbar {
+            background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
+            color: white;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .btn-logout {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+        /* 侧边栏 */
+        .layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: white;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 12px 24px;
+            color: #555;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: #f0f5ff;
+            color: #2d6a9f;
+        }
+
+        .nav-item.active {
+            background: #e8f0fe;
+            color: #2d6a9f;
+            border-left-color: #2d6a9f;
+            font-weight: 600;
+        }
+
+        .nav-item .icon { margin-right: 8px; }
+
+        .nav-section {
+            padding: 16px 24px 6px;
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* 主内容 */
+        .main-content {
+            flex: 1;
+            padding: 28px;
+            overflow: auto;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a3a5c;
+            margin-bottom: 24px;
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            font-size: 36px;
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon.blue { background: #e8f0fe; }
+        .stat-icon.green { background: #e8f8f0; }
+        .stat-icon.orange { background: #fff3e0; }
+        .stat-icon.red { background: #fce8e8; }
+
+        .stat-info h3 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a3a5c;
+        }
+
+        .stat-info p {
+            font-size: 13px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* 快捷操作 */
+        .quick-actions {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 28px;
+        }
+
+        .quick-actions h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 12px;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: #444;
+        }
+
+        .action-btn:hover {
+            border-color: #2d6a9f;
+            background: #f0f5ff;
+            color: #2d6a9f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(45,106,159,0.15);
+        }
+
+        .action-btn .action-icon { font-size: 32px; margin-bottom: 8px; }
+        .action-btn span { font-size: 13px; font-weight: 500; }
+
+        /* 最近提交 */
+        .recent-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .btn-more {
+            color: #2d6a9f;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 10px 14px;
+            text-align: left;
+            color: #666;
+            font-weight: 600;
+            border-bottom: 1px solid #eee;
+        }
+
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #444;
+        }
+
+        tr:hover td { background: #fafafa; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-done { background: #e8f8f0; color: #2d9e66; }
+        .status-pending { background: #fff3e0; color: #e67e22; }
+        .status-error { background: #fce8e8; color: #c0392b; }
+        .status-checking { background: #e8f0fe; color: #2d6a9f; }
+
+        .loading { text-align: center; padding: 40px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<nav class="navbar">
+    <div class="navbar-brand">
+        🏗️ 薪核通 PayClear
+    </div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <button class="btn-logout" onclick="logout()">退出登录</button>
+    </div>
+</nav>
+
+<div class="layout">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item active"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+
+        <div class="nav-section admin-only">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main-content">
+        <div class="page-title">工作台</div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">👷</div>
+                <div class="stat-info">
+                    <h3 id="stat-workers">-</h3>
+                    <p>登记工人数</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">📋</div>
+                <div class="stat-info">
+                    <h3 id="stat-submissions">-</h3>
+                    <p>月度提交数</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">🏢</div>
+                <div class="stat-info">
+                    <h3 id="stat-teams">-</h3>
+                    <p>分包队伍数</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">🏦</div>
+                <div class="stat-info">
+                    <h3 id="stat-bank">-</h3>
+                    <p>联行号库记录</p>
+                </div>
+            </div>
+            <div class="stat-card admin-only" style="cursor:pointer" onclick="window.location='/workers.html?status=pending'">
+                <div class="stat-icon orange">⏳</div>
+                <div class="stat-info">
+                    <h3 id="stat-pending">-</h3>
+                    <p>暂存库工人</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="quick-actions">
+            <h2>快捷操作</h2>
+            <div class="action-grid">
+                <a href="/upload.html" class="action-btn">
+                    <div class="action-icon">📤</div>
+                    <span>上传本月表格</span>
+                </a>
+                <a href="/report.html" class="action-btn">
+                    <div class="action-icon">📊</div>
+                    <span>查看核对报告</span>
+                </a>
+                <a href="/workers.html" class="action-btn">
+                    <div class="action-icon">👷</div>
+                    <span>查看工人信息</span>
+                </a>
+                <a href="/import.html" class="action-btn admin-only">
+                    <div class="action-icon">📥</div>
+                    <span>历史数据导入</span>
+                </a>
+                <a href="/admin.html" class="action-btn admin-only">
+                    <div class="action-icon">⚙️</div>
+                    <span>系统设置</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 最近提交 -->
+        <div class="recent-section">
+            <div class="section-header">
+                <h2>最近提交记录</h2>
+                <a href="/upload.html" class="btn-more">查看全部 →</a>
+            </div>
+            <div id="recent-list">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    async function loadDashboard() {
+        // 加载统计数据
+        try {
+            const [workers, submissions, teams, bankStats, pendingWorkers] = await Promise.allSettled([
+                getWorkers({ page_size: 1 }),
+                getSubmissions(),
+                getTeams(),
+                getBankRoutingStats(),
+                getPendingWorkers({ page_size: 1 }),
+            ]);
+
+            if (workers.status === 'fulfilled') {
+                document.getElementById('stat-workers').textContent = workers.value?.total || 0;
+            }
+            if (submissions.status === 'fulfilled') {
+                document.getElementById('stat-submissions').textContent = submissions.value?.length || 0;
+            }
+            if (teams.status === 'fulfilled') {
+                document.getElementById('stat-teams').textContent = teams.value?.length || 0;
+            }
+            if (bankStats.status === 'fulfilled') {
+                const n = bankStats.value?.total_records || 0;
+                document.getElementById('stat-bank').textContent = n > 10000 ? (n/10000).toFixed(1) + '万' : n;
+            }
+            if (pendingWorkers.status === 'fulfilled') {
+                const n = pendingWorkers.value?.total || 0;
+                const el = document.getElementById('stat-pending');
+                if (el) el.textContent = n;
+            }
+        } catch(e) {}
+
+        // 加载最近提交
+        try {
+            const subs = await getSubmissions();
+            const recent = (subs || []).slice(0, 10);
+
+            if (recent.length === 0) {
+                document.getElementById('recent-list').innerHTML =
+                    '<div class="loading">暂无提交记录，<a href="/upload.html" style="color:#2d6a9f">立即上传</a></div>';
+                return;
+            }
+
+            const teams = await getTeams();
+            const teamMap = {};
+            (teams || []).forEach(t => teamMap[t.id] = t.name);
+
+            const statusMap = {
+                'pending': '<span class="status-badge status-pending">待核对</span>',
+                'checking': '<span class="status-badge status-checking">核对中</span>',
+                'done': '<span class="status-badge status-done">已完成</span>',
+                'error': '<span class="status-badge status-error">有错误</span>',
+            };
+
+            const rows = recent.map(s => `
+                <tr>
+                    <td>${teamMap[s.team_id] || '队伍#' + s.team_id}</td>
+                    <td>${s.year}年${s.month}月</td>
+                    <td>${s.files?.length || 0} 个文件</td>
+                    <td>${statusMap[s.status] || s.status}</td>
+                    <td>${formatDate(s.submitted_at)}</td>
+                    <td>
+                        <a href="/upload.html?submission_id=${s.id}" style="color:#2d6a9f;text-decoration:none;font-size:13px">查看</a>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('recent-list').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>队伍</th><th>月份</th><th>文件数</th>
+                            <th>状态</th><th>提交时间</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            document.getElementById('recent-list').innerHTML = '<div class="loading">加载失败</div>';
+        }
+    }
+
+    loadDashboard();
+</script>
+</body>
+</html>

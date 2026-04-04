@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>核对报告 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+        .card-header h2 { font-size: 16px; color: #333; font-weight: 600; }
+
+        /* 报告列表 */
+        .report-list-item {
+            padding: 16px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .report-list-item:hover { border-color: #2d6a9f; background: #f8fbff; }
+        .report-list-item.selected { border-color: #2d6a9f; background: #e8f0fe; }
+
+        .report-meta { font-size: 13px; color: #888; margin-top: 4px; }
+
+        .badge-group { display: flex; gap: 8px; align-items: center; }
+
+        .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-error { background: #fce8e8; color: #c0392b; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-ok { background: #d4edda; color: #155724; }
+
+        /* 报告详情 */
+        .report-detail { display: none; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+
+        .summary-card { background: #f8f9fa; border-radius: 10px; padding: 20px; text-align: center; }
+        .summary-card .num { font-size: 36px; font-weight: 700; }
+        .summary-card .lbl { font-size: 13px; color: #888; margin-top: 4px; }
+        .num-total { color: #2d6a9f; }
+        .num-error { color: #dc3545; }
+        .num-warning { color: #e67e22; }
+
+        /* 筛选栏 */
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .filter-bar select, .filter-bar input {
+            padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; outline: none; background: white;
+        }
+        .filter-bar select:focus, .filter-bar input:focus { border-color: #2d6a9f; }
+
+        /* 问题表格 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .severity-error { color: #c0392b; font-weight: 600; }
+        .severity-warning { color: #e67e22; font-weight: 600; }
+        .severity-info { color: #2980b9; }
+
+        .type-cross { background: #fce8e8; }
+        .type-routing { background: #fff3e0; }
+        .type-history { background: #e8f4fd; }
+
+        .btn { padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #1e7e34; }
+
+        .empty-state { text-align: center; padding: 60px; color: #aaa; }
+        .empty-state .icon { font-size: 64px; display: block; margin-bottom: 16px; }
+
+        .no-issues { text-align: center; padding: 40px; color: #28a745; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item active"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section admin-only">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">核对报告</div>
+
+        <div style="display:grid;grid-template-columns:320px 1fr;gap:20px">
+            <!-- 左侧：报告列表 -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>报告列表</h2>
+                    </div>
+                    <div id="report-list">
+                        <div style="text-align:center;padding:30px;color:#aaa">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：报告详情 -->
+            <div>
+                <div class="card" id="detail-placeholder">
+                    <div class="empty-state">
+                        <span class="icon">📊</span>
+                        <p>从左侧选择一份报告查看详情</p>
+                    </div>
+                </div>
+
+                <div class="card report-detail" id="report-detail">
+                    <div class="card-header">
+                        <h2 id="detail-title">报告详情</h2>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-success" id="btn-export" onclick="doExport()">📥 导出Excel</button>
+                        </div>
+                    </div>
+
+                    <!-- 汇总 -->
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="num num-total" id="d-workers">-</div>
+                            <div class="lbl">涉及工人</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="num num-error" id="d-errors">-</div>
+                            <div class="lbl">错误项</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="num num-warning" id="d-warnings">-</div>
+                            <div class="lbl">警告项</div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选 -->
+                    <div class="filter-bar">
+                        <select id="filter-severity" onchange="renderIssues()">
+                            <option value="">全部严重程度</option>
+                            <option value="error">❌ 仅错误</option>
+                            <option value="warning">⚠️ 仅警告</option>
+                        </select>
+                        <select id="filter-type" onchange="renderIssues()">
+                            <option value="">全部类型</option>
+                            <option value="cross_table">三表核对</option>
+                            <option value="bank_routing">联行号核对</option>
+                            <option value="history">历史数据</option>
+                        </select>
+                        <input type="text" id="filter-search" placeholder="搜索姓名或身份证" oninput="renderIssues()">
+                        <span id="filter-count" style="font-size:13px;color:#888"></span>
+                    </div>
+
+                    <!-- 问题表格 -->
+                    <div id="issues-container">
+                        <div class="no-issues">✅ 加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+
+    let allReports = [];
+    let currentReport = null;
+    let allIssues = [];
+
+    const typeMap = {
+        cross_table: '三表核对',
+        bank_routing: '联行号核对',
+        history: '历史数据',
+    };
+
+    const severityMap = {
+        error: '<span class="severity-error">❌ 错误</span>',
+        warning: '<span class="severity-warning">⚠️ 警告</span>',
+        info: '<span class="severity-info">ℹ️ 提示</span>',
+    };
+
+    async function loadReports() {
+        try {
+            allReports = await getReports() || [];
+
+            if (allReports.length === 0) {
+                document.getElementById('report-list').innerHTML =
+                    '<div style="text-align:center;padding:30px;color:#aaa">暂无报告</div>';
+                return;
+            }
+
+            // 加载队伍信息
+            const teams = await getTeams().catch(() => []);
+            const teamsMap = {};
+            (teams || []).forEach(t => teamsMap[t.id] = t.name);
+
+            const submissions = await getSubmissions().catch(() => []);
+            const subMap = {};
+            (submissions || []).forEach(s => subMap[s.id] = s);
+
+            const html = allReports.map((r, idx) => {
+                const sub = subMap[r.submission_id] || {};
+                const teamName = teamsMap[sub.team_id] || '未知队伍';
+                const period = sub.year ? `${sub.year}年${sub.month}月` : '未知月份';
+
+                const errBadge = r.error_count > 0
+                    ? `<span class="badge badge-error">❌ ${r.error_count}错误</span>`
+                    : '';
+                const warnBadge = r.warning_count > 0
+                    ? `<span class="badge badge-warning">⚠️ ${r.warning_count}警告</span>`
+                    : '';
+                const okBadge = (r.error_count === 0 && r.warning_count === 0)
+                    ? `<span class="badge badge-ok">✅ 无异常</span>`
+                    : '';
+
+                return `
+                    <div class="report-list-item" id="report-item-${r.id}" onclick="selectReport(${r.id})">
+                        <div>
+                            <div style="font-weight:600;font-size:14px">${teamName} · ${period}</div>
+                            <div class="report-meta">${formatDate(r.generated_at)} · ${r.total_workers}名工人</div>
+                        </div>
+                        <div class="badge-group">${errBadge}${warnBadge}${okBadge}</div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('report-list').innerHTML = html;
+
+            // 如果URL带了id参数，自动选中
+            const params = new URLSearchParams(window.location.search);
+            const rid = params.get('id');
+            if (rid) {
+                selectReport(parseInt(rid));
+            }
+
+        } catch(e) {
+            document.getElementById('report-list').innerHTML =
+                `<div style="color:#dc3545;padding:16px">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    async function selectReport(reportId) {
+        // 高亮选中
+        document.querySelectorAll('.report-list-item').forEach(el => el.classList.remove('selected'));
+        const item = document.getElementById('report-item-' + reportId);
+        if (item) item.classList.add('selected');
+
+        try {
+            const report = await getReport(reportId);
+            currentReport = report;
+            allIssues = report.issues || [];
+
+            document.getElementById('detail-placeholder').style.display = 'none';
+            document.getElementById('report-detail').style.display = 'block';
+
+            document.getElementById('d-workers').textContent = report.total_workers;
+            document.getElementById('d-errors').textContent = report.error_count;
+            document.getElementById('d-warnings').textContent = report.warning_count;
+
+            // 找到提交信息
+            const submissions = await getSubmissions().catch(() => []);
+            const sub = submissions.find(s => s.id === report.submission_id) || {};
+            const teams = await getTeams().catch(() => []);
+            const team = teams.find(t => t.id === sub.team_id) || {};
+
+            document.getElementById('detail-title').textContent =
+                `${team.name || '队伍'} ${sub.year || ''}年${sub.month || ''}月 核对报告`;
+
+            renderIssues();
+
+        } catch(e) {
+            showToast('加载报告失败: ' + e.message, 'error');
+        }
+    }
+
+    function renderIssues() {
+        const severityFilter = document.getElementById('filter-severity').value;
+        const typeFilter = document.getElementById('filter-type').value;
+        const searchFilter = document.getElementById('filter-search').value.trim().toLowerCase();
+
+        let filtered = allIssues.filter(issue => {
+            if (severityFilter && issue.severity !== severityFilter) return false;
+            if (typeFilter && issue.issue_type !== typeFilter) return false;
+            if (searchFilter) {
+                const text = `${issue.worker_name}${issue.id_card}${issue.description}`.toLowerCase();
+                if (!text.includes(searchFilter)) return false;
+            }
+            return true;
+        });
+
+        document.getElementById('filter-count').textContent = `共 ${filtered.length} 条`;
+
+        if (filtered.length === 0 && allIssues.length === 0) {
+            document.getElementById('issues-container').innerHTML =
+                '<div class="no-issues">🎉 未发现任何异常，核对通过！</div>';
+            return;
+        }
+
+        if (filtered.length === 0) {
+            document.getElementById('issues-container').innerHTML =
+                '<div class="no-issues" style="color:#888">当前筛选条件下无结果</div>';
+            return;
+        }
+
+        const rows = filtered.map((issue, idx) => `
+            <tr>
+                <td>${idx + 1}</td>
+                <td>${severityMap[issue.severity] || issue.severity}</td>
+                <td>${typeMap[issue.issue_type] || issue.issue_type}</td>
+                <td><strong>${issue.worker_name}</strong></td>
+                <td style="font-family:monospace">${issue.id_card}</td>
+                <td><strong>${issue.field}</strong></td>
+                <td>${issue.description}</td>
+                <td style="font-size:12px;color:#666">${issue.source_a || '-'}</td>
+                <td style="font-size:12px;color:#666">${issue.source_b || '-'}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('issues-container').innerHTML = `
+            <div style="overflow-x:auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>严重程度</th><th>问题类型</th>
+                            <th>姓名</th><th>身份证</th><th>字段</th>
+                            <th>问题描述</th><th>来源A</th><th>来源B</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    async function doExport() {
+        if (!currentReport) return;
+        try {
+            await exportReport(currentReport.id);
+            showToast('导出成功', 'success');
+        } catch(e) {
+            showToast('导出失败: ' + e.message, 'error');
+        }
+    }
+
+    loadReports();
+</script>
+</body>
+</html>
