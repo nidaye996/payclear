@@ -496,7 +496,7 @@
         };
 
         try {
-            await apiRequest(`/api/workers/${currentWorkerId}`, { method: 'PUT', body: JSON.stringify(payload) });
+            await api.put(`/workers/${currentWorkerId}`, payload);
             showToast('保存成功', 'success');
             closeModal();
             loadWorkers(currentPage);
@@ -525,10 +525,7 @@
 
     async function doDeleteWorker(reason) {
         try {
-            await apiRequest(`/api/workers/${currentWorkerId}`, {
-                method: 'DELETE',
-                body: JSON.stringify({ reason: reason || null })
-            });
+            await api.delete(`/workers/${currentWorkerId}`, { reason: reason || null });
             alert('删除成功，数据已归档。');
             closeModal();
             loadWorkers(currentPage);

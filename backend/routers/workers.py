@@ -124,20 +124,42 @@ def update_worker(
         worker.phone = data.phone
 
     # 更新当前有效的银行信息
-    bank_info = db.query(WorkerBankInfo).filter(
-        WorkerBankInfo.worker_id == worker_id,
-        WorkerBankInfo.valid_to == None
-    ).first()
+    has_bank_fields = any(v is not None for v in [
+        data.bank_card, data.bank_name, data.bank_branch, data.routing_number
+    ])
 
-    if bank_info:
-        if data.bank_card is not None:
-            bank_info.bank_card = data.bank_card
-        if data.bank_name is not None:
-            bank_info.bank_name = data.bank_name
-        if data.bank_branch is not None:
-            bank_info.bank_branch = data.bank_branch
-        if data.routing_number is not None:
-            bank_info.routing_number = data.routing_number
+    if has_bank_fields:
+        bank_info = db.query(WorkerBankInfo).filter(
+            WorkerBankInfo.worker_id == worker_id,
+            WorkerBankInfo.valid_to == None  # noqa: E711
+        ).first()
+
+        if bank_info:
+            if data.bank_card is not None:
+                bank_info.bank_card = data.bank_card
+            if data.bank_name is not None:
+                bank_info.bank_name = data.bank_name
+            if data.bank_branch is not None:
+                bank_info.bank_branch = data.bank_branch
+            if data.routing_number is not None:
+                bank_info.routing_number = data.routing_number
+        else:
+            # 工人尚无银行信息记录，新建一条
+            # team_id 取该工人任意一条历史记录的 team_id，若无则用 0
+            any_bank = db.query(WorkerBankInfo).filter(
+                WorkerBankInfo.worker_id == worker_id
+            ).first()
+            team_id = any_bank.team_id if any_bank else 0
+            db.add(WorkerBankInfo(
+                worker_id=worker_id,
+                team_id=team_id,
+                bank_card=data.bank_card,
+                bank_name=data.bank_name,
+                bank_branch=data.bank_branch,
+                routing_number=data.routing_number,
+                valid_from=None,
+                status='confirmed',
+            ))
 
     db.commit()
     return {"message": "修改成功"}

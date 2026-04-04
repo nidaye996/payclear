@@ -106,7 +106,7 @@ const api = {
     get: (path) => request('GET', path),
     post: (path, data) => request('POST', path, data),
     put: (path, data) => request('PUT', path, data),
-    delete: (path) => request('DELETE', path),
+    delete: (path, data) => request('DELETE', path, data),
     postForm: (path, formData) => request('POST', path, formData, true),
 };
 
@@ -205,10 +205,6 @@ async function uploadFile(submissionId, fileType, file) {
 
 async function runCheck(submissionId) {
     return await api.post(`/submissions/${submissionId}/check`);
-}
-
-async function confirmSubmission(submissionId) {
-    return await api.post(`/submissions/${submissionId}/confirm`);
 }
 
 // ==================== 报告 API ====================

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from database import Base, BankBase, engine, bank_engine, get_db, get_bank_db
+from database import Base, BankBase, engine, bank_engine, get_db, get_bank_db, DATA_DIR
 import models  # 触发模型注册
 
 from routers import auth, teams, workers, submissions, reports, historical, backup
@@ -25,8 +25,6 @@ from models import User, BankRouting
 import time
 from logging.handlers import RotatingFileHandler
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-os.makedirs(DATA_DIR, exist_ok=True)
 LOG_PATH = os.path.join(DATA_DIR, "app.log")
 
 _log_formatter = logging.Formatter(
