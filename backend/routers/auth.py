@@ -3,7 +3,8 @@
 """
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -79,25 +80,69 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
     return current_user
 
 
+# ==================== 登录限速 ====================
+
+# { ip: {"count": N, "locked_until": datetime or None} }
+_login_attempts: dict = defaultdict(lambda: {"count": 0, "locked_until": None})
+MAX_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_rate_limit(ip: str):
+    entry = _login_attempts[ip]
+    now = datetime.utcnow()
+    if entry["locked_until"] and now < entry["locked_until"]:
+        remaining = int((entry["locked_until"] - now).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"登录失败次数过多，请 {remaining} 分钟后再试",
+        )
+
+
+def _record_failure(ip: str):
+    entry = _login_attempts[ip]
+    entry["count"] += 1
+    if entry["count"] >= MAX_ATTEMPTS:
+        entry["locked_until"] = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+        entry["count"] = 0
+
+
+def _record_success(ip: str):
+    _login_attempts[ip] = {"count": 0, "locked_until": None}
+
+
 # ==================== 路由 ====================
 
 @router.post("/login", response_model=TokenResponse)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """用户登录"""
+    ip = _get_client_ip(request)
+    _check_rate_limit(ip)
+
     user = db.query(User).filter(
         User.username == form_data.username,
         User.is_active == True
     ).first()
 
     if not user or not verify_password(form_data.password, user.password_hash):
+        _record_failure(ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
 
+    _record_success(ip)
     token = create_access_token({"sub": str(user.id)})
 
     return TokenResponse(
