@@ -16,7 +16,8 @@ from schemas import TokenResponse, UserCreate, UserOut, UserUpdate
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 # JWT 配置
-SECRET_KEY = "salary-system-secret-key-change-in-production-2024"
+import os
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-secret-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8小时
 
