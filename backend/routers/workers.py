@@ -1,10 +1,13 @@
 """
 工人管理路由
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+
+_audit = logging.getLogger("audit")
 
 from database import get_db
 from models import Worker, WorkerBankInfo, User, DeletedWorkerArchive, Team
@@ -191,6 +194,8 @@ def delete_worker(
     db.delete(worker)
     db.commit()
 
+    _audit.info("WORKER_DELETE name=%s id_card=%s by=%s reason=%s",
+                worker.name, worker.id_card, current_user.username, data.reason or "")
     return {"message": f"工人 {worker.name} 已删除并归档"}
 
 

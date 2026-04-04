@@ -16,6 +16,9 @@ from schemas import TokenResponse, UserCreate, UserOut, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
+import logging
+_audit = logging.getLogger("audit")
+
 # JWT 配置
 import os
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-secret-change-in-production")
@@ -100,18 +103,22 @@ def _check_rate_limit(ip: str):
     now = datetime.utcnow()
     if entry["locked_until"] and now < entry["locked_until"]:
         remaining = int((entry["locked_until"] - now).total_seconds() / 60) + 1
+        _audit.warning("LOGIN_BLOCKED ip=%s remaining_min=%d", ip, remaining)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"登录失败次数过多，请 {remaining} 分钟后再试",
         )
 
 
-def _record_failure(ip: str):
+def _record_failure(ip: str, username: str):
     entry = _login_attempts[ip]
     entry["count"] += 1
     if entry["count"] >= MAX_ATTEMPTS:
         entry["locked_until"] = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
         entry["count"] = 0
+        _audit.warning("LOGIN_LOCKED ip=%s username=%s locked_min=%d", ip, username, LOCKOUT_MINUTES)
+    else:
+        _audit.warning("LOGIN_FAIL ip=%s username=%s attempt=%d", ip, username, entry["count"])
 
 
 def _record_success(ip: str):
@@ -136,13 +143,14 @@ def login(
     ).first()
 
     if not user or not verify_password(form_data.password, user.password_hash):
-        _record_failure(ip)
+        _record_failure(ip, form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
 
     _record_success(ip)
+    _audit.info("LOGIN_OK username=%s ip=%s role=%s", user.username, ip, user.role)
     token = create_access_token({"sub": str(user.id)})
 
     return TokenResponse(
@@ -197,6 +205,7 @@ def create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    _audit.info("USER_CREATE username=%s role=%s by=%s", new_user.username, new_user.role, current_user.username)
     return new_user
 
 
@@ -241,6 +250,10 @@ def update_user(
 
     db.commit()
     db.refresh(target)
+    fields = []
+    if data.username: fields.append("username")
+    if data.password: fields.append("password")
+    _audit.info("USER_UPDATE target=%s fields=%s by=%s", target.username, ",".join(fields), current_user.username)
     return {"message": "修改成功", "username": target.username}
 
 
@@ -258,4 +271,5 @@ def delete_user(
         raise HTTPException(status_code=404, detail="用户不存在")
     user.is_active = False
     db.commit()
+    _audit.info("USER_DISABLE target=%s by=%s", user.username, current_user.username)
     return {"message": "用户已禁用"}

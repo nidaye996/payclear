@@ -20,6 +20,10 @@ env/
 *.db.before_restore
 backend/data/
 
+# 日志文件
+*.log
+*.log.*
+
 # 临时文件
 *.tmp
 *.log

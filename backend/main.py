@@ -8,7 +8,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import List
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -22,10 +22,28 @@ from routers.auth import get_current_user, require_admin, require_admin_or_opera
 from models import User, BankRouting
 
 # 日志配置
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+import time
+from logging.handlers import RotatingFileHandler
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+LOG_PATH = os.path.join(DATA_DIR, "app.log")
+
+_log_formatter = logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(name)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
+_file_handler = RotatingFileHandler(
+    LOG_PATH, maxBytes=10 * 1024 * 1024, backupCount=10, encoding='utf-8'
+)
+_file_handler.setFormatter(_log_formatter)
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(_log_formatter)
+
+logging.root.setLevel(logging.INFO)
+logging.root.addHandler(_file_handler)
+logging.root.addHandler(_console_handler)
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,6 +125,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==================== 请求日志中间件 ====================
+
+_req_logger = logging.getLogger("request")
+_SKIP_LOG_PATHS = {"/api/bank-routing/stats", "/api/auth/me"}
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = int((time.time() - start) * 1000)
+    path = request.url.path
+    if path not in _SKIP_LOG_PATHS and not path.startswith("/static"):
+        _req_logger.info(
+            "%s %s %d %dms",
+            request.method, path, response.status_code, duration_ms
+        )
+    return response
+
 
 # ==================== 注册路由 ====================
 app.include_router(auth.router, prefix="/api")

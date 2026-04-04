@@ -12,6 +12,8 @@ import re
 import json
 import logging
 import tempfile
+
+_audit = logging.getLogger("audit")
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -431,6 +433,8 @@ def confirm_historical(
     submission.status = 'done'
     db.commit()
 
+    _audit.info("HISTORICAL_IMPORT team_id=%s period=%s created=%d updated=%d by=%s",
+                team_id, period_str, created_count, updated_count, current_user.username)
     return {
         'created': created_count,
         'updated': updated_count,

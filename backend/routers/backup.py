@@ -11,6 +11,8 @@ import tempfile
 import logging
 from datetime import datetime
 
+_audit = logging.getLogger("audit")
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -68,6 +70,7 @@ def backup_download(
 
         os.unlink(tmp_db.name)
 
+        _audit.info("BACKUP_DOWNLOAD by=%s file=%s", current_user.username, zip_filename)
         return FileResponse(
             tmp_zip.name,
             media_type="application/zip",
@@ -142,7 +145,7 @@ async def backup_restore(
         # 替换数据库
         shutil.move(tmp_db.name, DB_PATH)
 
-        logger.info(f"数据库恢复成功，操作人: {current_user.username}，备份信息: {backup_info}")
+        _audit.info("BACKUP_RESTORE by=%s backup_time=%s", current_user.username, backup_info.get("backup_time", "unknown"))
 
         return {
             "message": "恢复成功，数据已更新",
