@@ -29,7 +29,7 @@ pip install -r requirements.txt
 bash start.sh
 ```
 
-启动后访问 `http://localhost:8000`，默认管理员账号：
+启动后访问 `http://localhost:19268`，默认管理员账号：
 
 ```
 用户名：admin
