@@ -344,13 +344,6 @@
                     <p>联行号库记录</p>
                 </div>
             </div>
-            <div class="stat-card admin-only" style="cursor:pointer" onclick="window.location='/workers.html?status=pending'">
-                <div class="stat-icon orange">⏳</div>
-                <div class="stat-info">
-                    <h3 id="stat-pending">-</h3>
-                    <p>暂存库工人</p>
-                </div>
-            </div>
         </div>
 
         <!-- 快捷操作 -->
@@ -377,6 +370,10 @@
                     <div class="action-icon">⚙️</div>
                     <span>系统设置</span>
                 </a>
+                <a href="/accounts.html" class="action-btn">
+                    <div class="action-icon">👤</div>
+                    <span>账号管理</span>
+                </a>
             </div>
         </div>
 
@@ -401,12 +398,11 @@
     async function loadDashboard() {
         // 加载统计数据
         try {
-            const [workers, submissions, teams, bankStats, pendingWorkers] = await Promise.allSettled([
+            const [workers, submissions, teams, bankStats] = await Promise.allSettled([
                 getWorkers({ page_size: 1 }),
                 getSubmissions(),
                 getTeams(),
                 getBankRoutingStats(),
-                getPendingWorkers({ page_size: 1 }),
             ]);
 
             if (workers.status === 'fulfilled') {
@@ -421,11 +417,6 @@
             if (bankStats.status === 'fulfilled') {
                 const n = bankStats.value?.total_records || 0;
                 document.getElementById('stat-bank').textContent = n > 10000 ? (n/10000).toFixed(1) + '万' : n;
-            }
-            if (pendingWorkers.status === 'fulfilled') {
-                const n = pendingWorkers.value?.total || 0;
-                const el = document.getElementById('stat-pending');
-                if (el) el.textContent = n;
             }
         } catch(e) {}
 
