@@ -89,7 +89,18 @@ async function request(method, path, data = null, isFormData = false) {
         }
 
         if (!response.ok) {
-            const errMsg = (result && result.detail) ? result.detail : `请求失败 (${response.status})`;
+            let errMsg;
+            if (result && result.detail) {
+                if (typeof result.detail === 'string') {
+                    errMsg = result.detail;
+                } else if (Array.isArray(result.detail)) {
+                    errMsg = result.detail.map(e => e.msg || JSON.stringify(e)).join(', ');
+                } else {
+                    errMsg = JSON.stringify(result.detail);
+                }
+            } else {
+                errMsg = `请求失败 (${response.status})`;
+            }
             throw new Error(errMsg);
         }
 
