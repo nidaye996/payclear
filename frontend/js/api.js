@@ -288,6 +288,20 @@ async function confirmHistorical(submissionId, approvedIdCards) {
     });
 }
 
+// ==================== 公告 API ====================
+
+async function getAnnouncements() {
+    return await api.get('/announcements');
+}
+
+async function createAnnouncement(content) {
+    return await api.post('/announcements', { content });
+}
+
+async function deleteAnnouncement(id) {
+    return await api.delete(`/announcements/${id}`);
+}
+
 // ==================== 工具函数 ====================
 
 function showToast(message, type = 'info') {

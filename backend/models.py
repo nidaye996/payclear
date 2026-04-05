@@ -156,6 +156,18 @@ class DeletedWorkerArchive(Base):
     operator = relationship("User")
 
 
+class Announcement(Base):
+    """系统公告"""
+    __tablename__ = "announcements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(Text, nullable=False, comment="公告内容")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    author = relationship("User")
+
+
 class MonthlySubmission(Base):
     """月度提交记录"""
     __tablename__ = "monthly_submissions"

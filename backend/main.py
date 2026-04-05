@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from database import Base, BankBase, engine, bank_engine, get_db, get_bank_db, DATA_DIR
 import models  # 触发模型注册
 
-from routers import auth, teams, workers, submissions, reports, historical, backup
+from routers import auth, teams, workers, submissions, reports, historical, backup, announcements
 from routers.auth import get_current_user, require_admin, require_admin_or_operator
 from models import User, BankRouting
 
@@ -151,6 +151,7 @@ app.include_router(submissions.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(historical.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
+app.include_router(announcements.router, prefix="/api")
 
 
 # ==================== 银行联号库管理路由 ====================
