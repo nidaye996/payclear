@@ -158,6 +158,7 @@ def login(
         role=user.role,
         team_id=user.team_id,
         username=user.username,
+        user_id=user.id,
     )
 
 

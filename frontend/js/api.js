@@ -132,6 +132,7 @@ async function login(username, password) {
     if (result) {
         setToken(result.access_token);
         setUserInfo({
+            id: result.user_id,
             username: result.username,
             role: result.role,
             team_id: result.team_id,

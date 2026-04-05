@@ -20,6 +20,7 @@ class TokenResponse(BaseModel):
     role: str
     team_id: Optional[int] = None
     username: str
+    user_id: int
 
 
 class UserCreate(BaseModel):
