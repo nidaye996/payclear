@@ -167,8 +167,8 @@
             margin-top: 2px;
         }
 
-        /* 快捷操作 */
-        .quick-actions {
+        /* 本月进度 */
+        .progress-section {
             background: white;
             border-radius: 12px;
             padding: 24px;
@@ -176,43 +176,26 @@
             margin-bottom: 28px;
         }
 
-        .quick-actions h2 {
+        .progress-section h2 {
             font-size: 16px;
             color: #333;
             margin-bottom: 16px;
             font-weight: 600;
         }
 
-        .action-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 12px;
+        .month-label {
+            font-size: 13px;
+            color: #888;
+            font-weight: normal;
+            margin-left: 8px;
         }
 
-        .action-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px 12px;
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            color: #444;
-        }
-
-        .action-btn:hover {
-            border-color: #2d6a9f;
-            background: #f0f5ff;
+        .btn-link {
             color: #2d6a9f;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(45,106,159,0.15);
+            text-decoration: none;
+            font-size: 13px;
         }
-
-        .action-btn .action-icon { font-size: 32px; margin-bottom: 8px; }
-        .action-btn span { font-size: 13px; font-weight: 500; }
+        .btn-link:hover { text-decoration: underline; }
 
         /* 最近提交 */
         .recent-section {
@@ -346,34 +329,11 @@
             </div>
         </div>
 
-        <!-- 快捷操作 -->
-        <div class="quick-actions">
-            <h2>快捷操作</h2>
-            <div class="action-grid">
-                <a href="/upload.html" class="action-btn">
-                    <div class="action-icon">📤</div>
-                    <span>上传本月表格</span>
-                </a>
-                <a href="/report.html" class="action-btn">
-                    <div class="action-icon">📊</div>
-                    <span>查看核对报告</span>
-                </a>
-                <a href="/workers.html" class="action-btn">
-                    <div class="action-icon">👷</div>
-                    <span>查看工人信息</span>
-                </a>
-                <a href="/import.html" class="action-btn admin-only">
-                    <div class="action-icon">📥</div>
-                    <span>历史数据导入</span>
-                </a>
-                <a href="/admin.html" class="action-btn admin-only">
-                    <div class="action-icon">⚙️</div>
-                    <span>系统设置</span>
-                </a>
-                <a href="/accounts.html" class="action-btn">
-                    <div class="action-icon">👤</div>
-                    <span>账号管理</span>
-                </a>
+        <!-- 本月提交进度 -->
+        <div class="progress-section">
+            <h2>本月提交进度 <span class="month-label" id="month-label"></span></h2>
+            <div id="progress-table">
+                <div class="loading">加载中...</div>
             </div>
         </div>
 
@@ -396,6 +356,11 @@
     renderUserInfo();
 
     async function loadDashboard() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        document.getElementById('month-label').textContent = `${year}年${month}月`;
+
         // 加载统计数据
         try {
             const [workers, submissions, teams, bankStats] = await Promise.allSettled([
@@ -404,21 +369,79 @@
                 getTeams(),
                 getBankRoutingStats(),
             ]);
-
-            if (workers.status === 'fulfilled') {
+            if (workers.status === 'fulfilled')
                 document.getElementById('stat-workers').textContent = workers.value?.total || 0;
-            }
-            if (submissions.status === 'fulfilled') {
+            if (submissions.status === 'fulfilled')
                 document.getElementById('stat-submissions').textContent = submissions.value?.length || 0;
-            }
-            if (teams.status === 'fulfilled') {
+            if (teams.status === 'fulfilled')
                 document.getElementById('stat-teams').textContent = teams.value?.length || 0;
-            }
             if (bankStats.status === 'fulfilled') {
                 const n = bankStats.value?.total_records || 0;
                 document.getElementById('stat-bank').textContent = n > 10000 ? (n/10000).toFixed(1) + '万' : n;
             }
         } catch(e) {}
+
+        // 加载本月提交进度
+        try {
+            const info = getUserInfo();
+            const isAdminOp = isAdminOrOperator();
+
+            const [subsResult, reportsResult, teamsResult] = await Promise.allSettled([
+                getSubmissions({ year, month }),
+                getReports({ year, month }),
+                isAdminOp ? getTeams() : Promise.resolve([]),
+            ]);
+
+            const subs = subsResult.status === 'fulfilled' ? (subsResult.value || []) : [];
+            const reports = reportsResult.status === 'fulfilled' ? (reportsResult.value || []) : [];
+            const teams = teamsResult.status === 'fulfilled' ? (teamsResult.value || []) : [];
+
+            // submission_id → report
+            const reportMap = {};
+            reports.forEach(r => reportMap[r.submission_id] = r);
+
+            // team_id → submission
+            const subMap = {};
+            subs.forEach(s => subMap[s.team_id] = s);
+
+            let rows = '';
+
+            if (isAdminOp) {
+                // 管理员/操作员：所有队伍一行
+                if (teams.length === 0) {
+                    rows = '<tr><td colspan="5" style="text-align:center;color:#aaa">暂无分包队伍</td></tr>';
+                } else {
+                    rows = teams.map(t => {
+                        const sub = subMap[t.id];
+                        const report = sub ? reportMap[sub.id] : null;
+                        return buildRow(t.name, sub, report);
+                    }).join('');
+                }
+            } else {
+                // 队伍负责人：只看自己
+                const sub = subs[0] || null;
+                const report = sub ? reportMap[sub.id] : null;
+                const teamName = '我的队伍';
+                rows = buildRow(teamName, sub, report);
+            }
+
+            document.getElementById('progress-table').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>队伍</th>
+                            <th>本月提交</th>
+                            <th>核查状态</th>
+                            <th>问题数</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } catch(e) {
+            document.getElementById('progress-table').innerHTML = '<div class="loading">加载失败</div>';
+        }
 
         // 加载最近提交
         try {
@@ -449,9 +472,7 @@
                     <td>${s.files?.length || 0} 个文件</td>
                     <td>${statusMap[s.status] || s.status}</td>
                     <td>${formatDate(s.submitted_at)}</td>
-                    <td>
-                        <a href="/upload.html?submission_id=${s.id}" style="color:#2d6a9f;text-decoration:none;font-size:13px">查看</a>
-                    </td>
+                    <td><a href="/upload.html?submission_id=${s.id}" class="btn-link">查看</a></td>
                 </tr>
             `).join('');
 
@@ -469,6 +490,47 @@
         } catch(e) {
             document.getElementById('recent-list').innerHTML = '<div class="loading">加载失败</div>';
         }
+    }
+
+    function buildRow(teamName, sub, report) {
+        if (!sub) {
+            return `<tr>
+                <td>${teamName}</td>
+                <td><span class="status-badge status-error">未提交</span></td>
+                <td>-</td>
+                <td>-</td>
+                <td><a href="/upload.html" class="btn-link">去上传</a></td>
+            </tr>`;
+        }
+
+        const statusMap = {
+            'pending': '<span class="status-badge status-pending">待核对</span>',
+            'checking': '<span class="status-badge status-checking">核对中</span>',
+            'done': '<span class="status-badge status-done">已完成</span>',
+            'error': '<span class="status-badge status-error">有错误</span>',
+        };
+        const statusBadge = statusMap[sub.status] || sub.status;
+
+        let issueCell = '-';
+        let actionCell = `<a href="/upload.html?submission_id=${sub.id}" class="btn-link">查看提交</a>`;
+
+        if (report) {
+            const total = (report.error_count || 0) + (report.warning_count || 0);
+            if (total > 0) {
+                issueCell = `<span style="color:#c0392b;font-weight:600">${total} 个</span>`;
+            } else {
+                issueCell = '<span style="color:#2d9e66">无</span>';
+            }
+            actionCell = `<a href="/report.html?id=${report.id}" class="btn-link">查看报告</a>`;
+        }
+
+        return `<tr>
+            <td>${teamName}</td>
+            <td><span class="status-badge status-done">已提交</span></td>
+            <td>${statusBadge}</td>
+            <td>${issueCell}</td>
+            <td>${actionCell}</td>
+        </tr>`;
     }
 
     loadDashboard();
