@@ -302,6 +302,7 @@
 <script>
     checkLoginStatus();
     renderUserInfo();
+    initAnnouncements();
 
     if (!isAdminOrOperator()) {
         showToast('此页面仅管理员或操作员可访问', 'error');

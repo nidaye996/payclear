@@ -294,12 +294,301 @@ async function getAnnouncements() {
     return await api.get('/announcements');
 }
 
-async function createAnnouncement(content) {
-    return await api.post('/announcements', { content });
+async function createAnnouncement(content, type = 'normal') {
+    return await api.post('/announcements', { content, type });
 }
 
 async function deleteAnnouncement(id) {
     return await api.delete(`/announcements/${id}`);
+}
+
+// ==================== 公告铃铛系统 ====================
+
+(function injectAnnStyles() {
+    if (document.getElementById('ann-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'ann-styles';
+    s.textContent = `
+        #ann-bell-wrap { position: relative; }
+        #ann-bell-btn {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white; padding: 6px 10px;
+            border-radius: 6px; cursor: pointer;
+            font-size: 16px; position: relative;
+            transition: background 0.2s;
+        }
+        #ann-bell-btn:hover { background: rgba(255,255,255,0.25); }
+        #ann-badge {
+            position: absolute; top: -5px; right: -5px;
+            background: #e74c3c; color: white;
+            border-radius: 10px; font-size: 11px;
+            min-width: 18px; height: 18px;
+            display: flex; align-items: center;
+            justify-content: center; padding: 0 4px;
+            font-weight: bold; pointer-events: none;
+        }
+        #ann-panel {
+            position: absolute; top: calc(100% + 8px); right: 0;
+            width: 360px; background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            z-index: 2000; overflow: hidden;
+        }
+        .ann-panel-header {
+            padding: 14px 16px; font-weight: 600;
+            font-size: 14px; color: #333;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex; align-items: center;
+            justify-content: space-between;
+        }
+        .ann-panel-close {
+            background: none; border: none;
+            cursor: pointer; color: #aaa; font-size: 16px;
+            line-height: 1; padding: 2px 6px; border-radius: 4px;
+        }
+        .ann-panel-close:hover { background: #f5f5f5; color: #666; }
+        .ann-list { max-height: 320px; overflow-y: auto; }
+        .ann-list-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .ann-list-item.unread { background: #fffbe6; }
+        .ann-item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .ann-item-content { font-size: 13px; color: #333; line-height: 1.5; flex: 1; white-space: pre-wrap; }
+        .ann-item-meta { font-size: 11px; color: #aaa; margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+        .ann-type-tag {
+            background: #fff3e0; color: #e67e22;
+            padding: 1px 6px; border-radius: 4px; font-size: 10px;
+        }
+        .ann-list-empty { padding: 28px; text-align: center; color: #aaa; font-size: 13px; }
+        .ann-del-btn {
+            background: none; border: none; color: #ddd;
+            cursor: pointer; font-size: 12px;
+            padding: 2px 5px; border-radius: 3px;
+            flex-shrink: 0; margin-left: 8px;
+        }
+        .ann-del-btn:hover { color: #e74c3c; background: #fce8e8; }
+        .ann-compose-area {
+            padding: 12px 16px;
+            border-top: 1px solid #f0f0f0;
+            background: #fafafa;
+        }
+        .ann-type-select {
+            width: 100%; margin-bottom: 8px;
+            padding: 6px 10px; border: 1px solid #ddd;
+            border-radius: 6px; font-size: 13px; background: white;
+        }
+        .ann-textarea {
+            width: 100%; border: 1px solid #ddd;
+            border-radius: 6px; padding: 8px 10px;
+            font-size: 13px; resize: none; height: 56px;
+            font-family: inherit; box-sizing: border-box;
+        }
+        .ann-textarea:focus { outline: none; border-color: #2d6a9f; }
+        .ann-post-btn {
+            margin-top: 8px; width: 100%;
+            background: #2d6a9f; color: white;
+            border: none; border-radius: 6px;
+            padding: 8px; cursor: pointer; font-size: 13px;
+        }
+        .ann-post-btn:hover { background: #1a3a5c; }
+        #ann-fs-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #ann-fs-modal {
+            background: white; border-radius: 16px;
+            padding: 40px 36px; max-width: 540px;
+            width: 92%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .ann-fs-icon { font-size: 44px; margin-bottom: 12px; }
+        .ann-fs-title { font-size: 20px; font-weight: 700; color: #1a3a5c; margin-bottom: 20px; }
+        .ann-fs-counter { font-size: 12px; color: #aaa; margin-bottom: 12px; }
+        .ann-fs-body {
+            font-size: 15px; color: #444; line-height: 1.7;
+            text-align: left; background: #f8f9fa;
+            border-radius: 8px; padding: 16px 20px;
+            margin-bottom: 16px; white-space: pre-wrap;
+        }
+        .ann-fs-meta { font-size: 12px; color: #aaa; margin-bottom: 24px; }
+        .ann-fs-read-btn {
+            background: #2d6a9f; color: white; border: none;
+            border-radius: 8px; padding: 12px 36px;
+            font-size: 15px; cursor: pointer; font-weight: 500;
+        }
+        .ann-fs-read-btn:hover { background: #1a3a5c; }
+    `;
+    document.head.appendChild(s);
+})();
+
+let _annList = [];
+let _annPanelOpen = false;
+let _fsQueue = [];
+
+function _getReadIds() {
+    try { return new Set(JSON.parse(localStorage.getItem('read_ann_ids') || '[]')); }
+    catch(e) { return new Set(); }
+}
+function _markRead(id) {
+    const ids = _getReadIds();
+    ids.add(id);
+    localStorage.setItem('read_ann_ids', JSON.stringify([...ids]));
+}
+
+async function initAnnouncements() {
+    const navbarRight = document.querySelector('.navbar-right');
+    if (!navbarRight || document.getElementById('ann-bell-wrap')) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'ann-bell-wrap';
+    wrap.innerHTML = `
+        <button id="ann-bell-btn" title="公告通知" onclick="_toggleAnnPanel(event)">
+            🔔
+            <span id="ann-badge" style="display:none"></span>
+        </button>
+        <div id="ann-panel" style="display:none">
+            <div class="ann-panel-header">
+                <span>📢 系统公告</span>
+                <button class="ann-panel-close" onclick="_toggleAnnPanel(event)">✕</button>
+            </div>
+            <div class="ann-list" id="ann-list-body"></div>
+            ${isAdmin() ? `
+            <div class="ann-compose-area">
+                <select id="ann-type-select" class="ann-type-select">
+                    <option value="normal">普通公告</option>
+                    <option value="fullscreen">全屏公告（登录后弹出）</option>
+                </select>
+                <textarea id="ann-input" class="ann-textarea" placeholder="输入公告内容..."></textarea>
+                <button class="ann-post-btn" onclick="_postAnn()">发布</button>
+            </div>` : ''}
+        </div>
+    `;
+    const logoutBtn = navbarRight.querySelector('.btn-logout');
+    navbarRight.insertBefore(wrap, logoutBtn);
+
+    document.addEventListener('click', function(e) {
+        const panel = document.getElementById('ann-panel');
+        const w = document.getElementById('ann-bell-wrap');
+        if (panel && w && !w.contains(e.target) && panel.style.display !== 'none') {
+            panel.style.display = 'none';
+            _annPanelOpen = false;
+        }
+    });
+
+    await _refreshAnn();
+}
+
+function _toggleAnnPanel(e) {
+    if (e) e.stopPropagation();
+    const panel = document.getElementById('ann-panel');
+    if (!panel) return;
+    _annPanelOpen = !_annPanelOpen;
+    panel.style.display = _annPanelOpen ? 'block' : 'none';
+    if (_annPanelOpen) {
+        _annList.forEach(a => _markRead(a.id));
+        _updateBadge();
+        _renderAnnList();
+    }
+}
+
+function _updateBadge() {
+    const readIds = _getReadIds();
+    const unread = _annList.filter(a => !readIds.has(a.id)).length;
+    const badge = document.getElementById('ann-badge');
+    if (!badge) return;
+    if (unread > 0) {
+        badge.textContent = unread > 99 ? '99+' : unread;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function _renderAnnList() {
+    const body = document.getElementById('ann-list-body');
+    if (!body) return;
+    const readIds = _getReadIds();
+    if (_annList.length === 0) {
+        body.innerHTML = '<div class="ann-list-empty">暂无公告</div>';
+        return;
+    }
+    body.innerHTML = _annList.map(a => {
+        const unread = !readIds.has(a.id);
+        const tag = a.type === 'fullscreen' ? '<span class="ann-type-tag">全屏</span>' : '';
+        const del = isAdmin() ? `<button class="ann-del-btn" onclick="_deleteAnn(${a.id})" title="删除">✕</button>` : '';
+        return `<div class="ann-list-item ${unread ? 'unread' : ''}" id="ann-item-${a.id}">
+            <div class="ann-item-top">
+                <div class="ann-item-content">${escapeHtml(a.content)}</div>
+                ${del}
+            </div>
+            <div class="ann-item-meta">${tag}${a.author_name} · ${formatDate(a.created_at)}</div>
+        </div>`;
+    }).join('');
+}
+
+async function _refreshAnn() {
+    try {
+        _annList = await getAnnouncements() || [];
+        _updateBadge();
+        if (_annPanelOpen) _renderAnnList();
+        const readIds = _getReadIds();
+        _fsQueue = _annList.filter(a => a.type === 'fullscreen' && !readIds.has(a.id));
+        if (_fsQueue.length > 0) _showNextFs();
+    } catch(e) {}
+}
+
+function _showNextFs() {
+    if (_fsQueue.length === 0) return;
+    const ann = _fsQueue[0];
+    let ov = document.getElementById('ann-fs-overlay');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'ann-fs-overlay'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div id="ann-fs-modal">
+        <div class="ann-fs-icon">📢</div>
+        <div class="ann-fs-title">系统公告</div>
+        ${_fsQueue.length > 1 ? `<div class="ann-fs-counter">还有 ${_fsQueue.length} 条未读公告</div>` : ''}
+        <div class="ann-fs-body">${escapeHtml(ann.content)}</div>
+        <div class="ann-fs-meta">${ann.author_name} · ${formatDate(ann.created_at)}</div>
+        <button class="ann-fs-read-btn" onclick="_confirmReadFs(${ann.id})">我已阅读</button>
+    </div>`;
+    ov.style.display = 'flex';
+}
+
+function _confirmReadFs(id) {
+    _markRead(id);
+    _fsQueue = _fsQueue.filter(a => a.id !== id);
+    _updateBadge();
+    if (_fsQueue.length > 0) { _showNextFs(); return; }
+    const ov = document.getElementById('ann-fs-overlay');
+    if (ov) ov.style.display = 'none';
+}
+
+async function _postAnn() {
+    const input = document.getElementById('ann-input');
+    const typeEl = document.getElementById('ann-type-select');
+    const content = input?.value?.trim();
+    if (!content) { showToast('请输入公告内容', 'warning'); return; }
+    try {
+        await createAnnouncement(content, typeEl?.value || 'normal');
+        input.value = '';
+        await _refreshAnn();
+        _renderAnnList();
+        showToast('公告已发布', 'success');
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function _deleteAnn(id) {
+    if (!confirm('确认删除这条公告？')) return;
+    try {
+        await deleteAnnouncement(id);
+        _annList = _annList.filter(a => a.id !== id);
+        _updateBadge();
+        _renderAnnList();
+        showToast('已删除', 'success');
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ==================== 工具函数 ====================
@@ -334,6 +623,11 @@ function showToast(message, type = 'info') {
         toast.style.transition = 'opacity 0.3s';
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function formatDate(dateStr) {

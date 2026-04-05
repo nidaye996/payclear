@@ -79,6 +79,18 @@ def _migrate_db():
         except Exception:
             pass  # 列已存在则忽略
 
+        # 添加 announcements.type 列
+        try:
+            conn.execute(
+                __import__('sqlalchemy').text(
+                    "ALTER TABLE announcements ADD COLUMN type VARCHAR DEFAULT 'normal'"
+                )
+            )
+            conn.commit()
+            logger.info("announcements.type 列添加成功")
+        except Exception:
+            pass
+
 
 def _init_admin():
     """初始化默认管理员账号"""

@@ -162,6 +162,7 @@ class Announcement(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False, comment="公告内容")
+    type = Column(String(20), default="normal", comment="normal/fullscreen")
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
