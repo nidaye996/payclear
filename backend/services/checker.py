@@ -236,6 +236,7 @@ def check_cross_tables(
         fields_to_check = {
             'name': '姓名',
             'bank_card': '银行卡号',
+            'bank_name': '开户银行',
             'routing_number': '联行号',
         }
 
@@ -306,54 +307,81 @@ def check_routing_numbers(
     bank_db: Session
 ) -> List[Dict[str, Any]]:
     """
-    核对联行号是否在联号库中存在
+    核对联行号：
+    1. 联行号必须在联号库中存在
+    2. 提交的开户银行名称必须与联号库中的 branch_name 完全一致
     """
     issues = []
 
-    # 收集所有联行号（附带工人信息）
-    routing_to_check: Dict[str, Dict] = {}  # routing -> worker info
+    # 收集所有联行号（附带工人信息，同一联行号可能多个工人，只记录一次去查库）
+    # key: routing_number, value: list of worker info
+    routing_workers: Dict[str, List[Dict]] = {}
 
     for id_card in all_id_cards:
+        worker_name = None
         for data_dict in (registry, salary, payment):
             data = data_dict.get(id_card, {})
+            if not worker_name:
+                worker_name = data.get('name')
             routing = data.get('routing_number')
-            if routing and routing not in routing_to_check:
-                routing_to_check[routing] = {
+            bank_name = data.get('bank_name', '')
+            if routing:
+                if routing not in routing_workers:
+                    routing_workers[routing] = []
+                routing_workers[routing].append({
                     'id_card': id_card,
-                    'name': data.get('name', '未知'),
-                    'bank_name': data.get('bank_name', ''),
-                }
+                    'name': worker_name or '未知',
+                    'bank_name': bank_name,
+                })
 
-    if not routing_to_check:
+    if not routing_workers:
         return issues
 
-    # 批量查询联号库
-    routing_list = list(routing_to_check.keys())
-    found_routings = set()
+    # 批量查询联号库，同时取出 branch_name
+    routing_list = list(routing_workers.keys())
+    routing_db_map: Dict[str, str] = {}  # routing_number -> branch_name
 
-    # SQLite 批量查询
     chunk_size = 500
     for i in range(0, len(routing_list), chunk_size):
         chunk = routing_list[i:i + chunk_size]
-        results = bank_db.query(BankRouting.routing_number).filter(
+        results = bank_db.query(BankRouting.routing_number, BankRouting.branch_name).filter(
             BankRouting.routing_number.in_(chunk)
         ).all()
         for r in results:
-            found_routings.add(r[0])
+            routing_db_map[r[0]] = r[1] or ''
 
-    # 找出不存在的联行号
-    for routing, worker_info in routing_to_check.items():
-        if routing not in found_routings:
-            issues.append({
-                'severity': 'error',
-                'issue_type': 'bank_routing',
-                'worker_name': worker_info['name'],
-                'id_card': worker_info['id_card'],
-                'field': '联行号',
-                'description': f'联行号 {routing} 在联号库中找不到对应记录',
-                'source_a': f'联行号: {routing}',
-                'source_b': f'银行名称: {worker_info.get("bank_name", "未知")}',
-            })
+    # 逐个工人校验
+    for routing, workers in routing_workers.items():
+        if routing not in routing_db_map:
+            # 联行号在库中不存在
+            for w in workers:
+                issues.append({
+                    'severity': 'error',
+                    'issue_type': 'bank_routing',
+                    'worker_name': w['name'],
+                    'id_card': w['id_card'],
+                    'field': '联行号',
+                    'description': f'联行号 {routing} 在联号库中找不到对应记录',
+                    'source_a': f'联行号: {routing}',
+                    'source_b': f'提交银行名称: {w["bank_name"] or "未填写"}',
+                })
+        else:
+            db_branch_name = routing_db_map[routing]
+            for w in workers:
+                submitted_bank = w['bank_name']
+                if not submitted_bank:
+                    continue
+                if submitted_bank != db_branch_name:
+                    issues.append({
+                        'severity': 'error',
+                        'issue_type': 'bank_routing',
+                        'worker_name': w['name'],
+                        'id_card': w['id_card'],
+                        'field': '开户银行',
+                        'description': f'开户银行名称与联号库不一致',
+                        'source_a': f'提交填写: {submitted_bank}',
+                        'source_b': f'联号库标准名称: {db_branch_name}',
+                    })
 
     return issues
 

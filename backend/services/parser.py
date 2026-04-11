@@ -269,12 +269,23 @@ def _extract_header_hints(header_rows: List[List[str]], col_count: int) -> Dict[
         '银行卡': 'bank_card',
         '卡号': 'bank_card',
         '账号': 'bank_card',
+        '收款方账号': 'bank_card',
+        '收款账号': 'bank_card',
         '联行号': 'routing_number',
         '行号': 'routing_number',
+        '收款银行联行号': 'routing_number',
+        '银行联行号': 'routing_number',
         '手机': 'phone',
         '电话': 'phone',
         '联系方式': 'phone',
         '姓名': 'name',
+        '收款方名称': 'name',
+        '收款人姓名': 'name',
+        '收款人': 'name',
+        '开户银行': 'bank_name',
+        '开户行': 'bank_name',
+        '收款方开户行': 'bank_name',
+        '收款方银行': 'bank_name',
         '实发': 'amount',
         '实发工资': 'amount',
         '支付金额': 'amount',
@@ -318,14 +329,19 @@ def _build_worker_records(
             # 每种类型只取第一个找到的值
             if ft == 'id_card' and 'id_card' not in record and is_id_card(cell):
                 record['id_card'] = cell.upper()
-            elif ft == 'bank_card' and 'bank_card' not in record and is_bank_card(cell):
-                record['bank_card'] = cell
+            elif ft == 'bank_card' and 'bank_card' not in record:
+                # 只检查位数，不用 Luhn，避免误杀国内部分银行卡号
+                clean = cell.replace(' ', '').replace('-', '')
+                if re.match(r'^\d{16,19}$', clean):
+                    record['bank_card'] = clean
             elif ft == 'routing_number' and 'routing_number' not in record and is_routing_number(cell):
                 record['routing_number'] = cell
             elif ft == 'phone' and 'phone' not in record and is_phone(cell):
                 record['phone'] = cell
             elif ft == 'name' and 'name' not in record and is_chinese_name(cell):
                 record['name'] = cell
+            elif ft == 'bank_name' and 'bank_name' not in record and cell:
+                record['bank_name'] = cell
             elif ft == 'amount' and 'amount' not in record and is_amount(cell):
                 record['amount'] = float(cell.replace(',', ''))
 
@@ -358,7 +374,7 @@ def _find_name_near_idcard(row: List[str], col_types: Dict[int, Dict[str, Any]])
 
 def _find_bank_name(row: List[str], col_types: Dict[int, Dict[str, Any]]) -> Optional[str]:
     """从行中找银行名称（包含"银行"或"信用社"等关键字的列）"""
-    bank_keywords = ['银行', '信用社', '农商', '农合', '邮储', '工行', '建行', '农行', '中行', '交行']
+    bank_keywords = ['银行', '信用社', '农商', '农合', '邮储', '工行', '建行', '农行', '中行', '交行', '村镇银行']
     for col_idx, cell in enumerate(row):
         cell = normalize_cell(cell)
         if not cell:
