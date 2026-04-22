@@ -23,7 +23,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "u
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 允许的文件类型
-VALID_FILE_TYPES = {'实名制表', '工资表', '支付明细'}
+VALID_FILE_TYPES = {'实名制表', '工资表', '支付明细', '考勤表'}
 ALLOWED_EXTENSIONS = {'.docx', '.xlsx', '.xls'}
 
 

@@ -205,9 +205,13 @@ def _generate_excel_report(issues: list, submission, report, submission_id: int 
     ws_issues.set_row(1, 25)
 
     type_map = {
-        'cross_table': '三表核对',
+        'format':       '格式校验',
+        'cross_table':  '四表核对',
         'bank_routing': '联行号核对',
-        'history': '历史数据核对',
+        'bin_mismatch': 'BIN码核查',
+        'salary_logic': '工资金额核查',
+        'attendance':   '出勤天数核查',
+        'history':      '历史数据核对',
     }
     severity_map = {
         'error': '❌ 错误',

@@ -1,8 +1,11 @@
 """
-三层核对逻辑服务
-1. 三表互相核对（实名制表 vs 工资表 vs 支付明细）
-2. 与银行联号库核对
-3. 与历史数据库核对
+核对逻辑服务
+1. 四表互相核对（实名制表 vs 工资表 vs 支付明细 vs 考勤表）
+2. 与银行联号库核对（联行号 + 银行机构全称 + 开户行名称 三字段全查）
+3. BIN码核查（卡号前缀对应银行 vs 开户行名称）
+4. 工资金额逻辑核查（应发-代扣=实发，明细表金额=实发）
+5. 出勤天数一致性核查（考勤表 vs 工资表）
+6. 与历史数据库核对
 """
 import json
 import logging
@@ -44,6 +47,7 @@ def run_check(
     registry_data: List[Dict] = []   # 实名制表
     salary_data: List[Dict] = []     # 工资表
     payment_data: List[Dict] = []    # 支付明细
+    attendance_data: List[Dict] = [] # 考勤表
 
     for f in files:
         if not f.parsed_data:
@@ -60,14 +64,15 @@ def run_check(
             salary_data = workers
         elif f.file_type == '支付明细':
             payment_data = workers
-
-    issues = []
-    all_id_cards = set()
+        elif f.file_type == '考勤表':
+            attendance_data = workers
 
     # 构建索引（以身份证为key）
-    registry_index = {w['id_card']: w for w in registry_data if w.get('id_card')}
-    salary_index = {w['id_card']: w for w in salary_data if w.get('id_card')}
-    payment_index = {w['id_card']: w for w in payment_data if w.get('id_card')}
+    registry_index  = {w['id_card']: w for w in registry_data  if w.get('id_card')}
+    salary_index    = {w['id_card']: w for w in salary_data    if w.get('id_card')}
+    payment_index   = {w['id_card']: w for w in payment_data   if w.get('id_card')}
+    # 考勤表以姓名为key（考勤表通常无身份证）
+    attendance_by_name = {w['name']: w for w in attendance_data if w.get('name')}
 
     all_id_cards = (
         set(registry_index.keys()) |
@@ -75,34 +80,39 @@ def run_check(
         set(payment_index.keys())
     )
 
+    issues = []
+
     # 第零层：基础格式校验
-    format_issues = check_format(
-        all_id_cards, registry_index, salary_index, payment_index
-    )
-    issues.extend(format_issues)
+    issues.extend(check_format(all_id_cards, registry_index, salary_index, payment_index))
 
-    # 第一层：三表互相核对
-    cross_issues = check_cross_tables(
-        all_id_cards, registry_index, salary_index, payment_index
-    )
-    issues.extend(cross_issues)
+    # 第一层：四表人员名单 + 关键字段一致性核对
+    issues.extend(check_cross_tables(
+        all_id_cards, registry_index, salary_index, payment_index, attendance_by_name
+    ))
 
-    # 第二层：联行号核对
-    routing_issues = check_routing_numbers(
+    # 第二层：联行号核对（三字段全查：联行号 + 银行机构全称 + 开户行名称）
+    issues.extend(check_routing_numbers(
         all_id_cards, registry_index, salary_index, payment_index, bank_db
-    )
-    issues.extend(routing_issues)
+    ))
 
-    # 第三层：历史数据核对
-    history_issues = check_history(
+    # 第三层：BIN码核查（卡号对应银行 vs 开户行名称）
+    issues.extend(check_bin_codes(all_id_cards, registry_index, salary_index, payment_index))
+
+    # 第四层：工资金额逻辑核查
+    issues.extend(check_salary_logic(all_id_cards, salary_index, payment_index))
+
+    # 第五层：出勤天数一致性（考勤表 vs 工资表）
+    if attendance_by_name:
+        issues.extend(check_attendance_consistency(all_id_cards, salary_index, attendance_by_name))
+
+    # 第六层：历史数据核对
+    issues.extend(check_history(
         all_id_cards, registry_index, salary_index,
         submission.team_id, submission.year, submission.month, db,
         payment=payment_index
-    )
-    issues.extend(history_issues)
+    ))
 
-    # 统计
-    error_count = sum(1 for i in issues if i['severity'] == 'error')
+    error_count   = sum(1 for i in issues if i['severity'] == 'error')
     warning_count = sum(1 for i in issues if i['severity'] == 'warning')
 
     return {
@@ -206,12 +216,19 @@ def check_cross_tables(
     all_id_cards: set,
     registry: Dict[str, Dict],
     salary: Dict[str, Dict],
-    payment: Dict[str, Dict]
+    payment: Dict[str, Dict],
+    attendance_by_name: Dict[str, Dict] = None,
 ) -> List[Dict[str, Any]]:
     """
-    三表互相核对：同一身份证号，姓名/银行卡号/联行号要一致
+    四表互相核对：
+    - 实名制表 / 工资表 / 支付明细：姓名、身份证、银行卡号、开户银行、联行号必须一致
+    - 考勤表：人员名单必须与其他三表一致（考勤表通常只有姓名，无银行信息）
     """
     issues = []
+    attendance_by_name = attendance_by_name or {}
+
+    # 考勤表姓名集合
+    attendance_names = set(attendance_by_name.keys())
 
     for id_card in all_id_cards:
         r = registry.get(id_card, {})
@@ -220,44 +237,35 @@ def check_cross_tables(
 
         worker_name = r.get('name') or s.get('name') or p.get('name') or '未知'
 
-        # 检查哪些表包含该工人
         sources = {
             '实名制表': r if r else None,
-            '工资表': s if s else None,
+            '工资表':   s if s else None,
             '支付明细': p if p else None,
         }
         present_sources = {k: v for k, v in sources.items() if v}
 
-        if len(present_sources) < 2:
-            # 只在一张表中出现，无法互相核对
-            continue
-
-        # 核对字段
+        # ── 三表关键字段一致性 ──
         fields_to_check = {
-            'name': '姓名',
-            'bank_card': '银行卡号',
-            'bank_name': '开户银行',
+            'name':           '姓名',
+            'bank_card':      '银行卡号',
+            'bank_name':      '开户银行',
             'routing_number': '联行号',
         }
 
         for field, field_label in fields_to_check.items():
-            values = {}
-            for source_name, data in present_sources.items():
-                val = data.get(field)
-                if val:
-                    values[source_name] = val
-
+            values = {
+                src: data[field]
+                for src, data in present_sources.items()
+                if data.get(field)
+            }
             if len(values) < 2:
                 continue
-
-            # 检查值是否一致
-            unique_values = set(values.values())
-            if len(unique_values) > 1:
-                source_names = list(values.keys())
-                for i in range(len(source_names)):
-                    for j in range(i + 1, len(source_names)):
-                        va = values[source_names[i]]
-                        vb = values[source_names[j]]
+            unique_vals = set(values.values())
+            if len(unique_vals) > 1:
+                src_list = list(values.keys())
+                for i in range(len(src_list)):
+                    for j in range(i + 1, len(src_list)):
+                        va, vb = values[src_list[i]], values[src_list[j]]
                         if va != vb:
                             issues.append({
                                 'severity': 'error',
@@ -265,39 +273,61 @@ def check_cross_tables(
                                 'worker_name': worker_name,
                                 'id_card': id_card,
                                 'field': field_label,
-                                'description': f'{source_names[i]}与{source_names[j]}中{field_label}不一致',
-                                'source_a': f'{source_names[i]}: {va}',
-                                'source_b': f'{source_names[j]}: {vb}',
+                                'description': f'{src_list[i]}与{src_list[j]}中{field_label}不一致',
+                                'source_a': f'{src_list[i]}: {va}',
+                                'source_b': f'{src_list[j]}: {vb}',
                             })
 
-        # 检查是否每张表都有该工人
-        if registry and id_card not in registry:
+        # ── 表格出现完整性检查 ──
+        for tbl_name, tbl_index in [('实名制表', registry), ('工资表', salary), ('支付明细', payment)]:
+            if tbl_index and id_card not in tbl_index:
+                issues.append({
+                    'severity': 'warning',
+                    'issue_type': 'cross_table',
+                    'worker_name': worker_name,
+                    'id_card': id_card,
+                    'field': '出现表格',
+                    'description': f'工人在{tbl_name}中缺失',
+                    'source_a': None,
+                    'source_b': None,
+                })
+
+        # ── 考勤表人员核对 ──
+        if attendance_names and worker_name and worker_name not in attendance_names:
             issues.append({
                 'severity': 'warning',
                 'issue_type': 'cross_table',
                 'worker_name': worker_name,
                 'id_card': id_card,
                 'field': '出现表格',
-                'description': f'工人在实名制表中缺失',
+                'description': '工人在考勤表中缺失',
                 'source_a': None,
                 'source_b': None,
             })
-        if salary and id_card not in salary:
-            issues.append({
-                'severity': 'warning',
-                'issue_type': 'cross_table',
-                'worker_name': worker_name,
-                'id_card': id_card,
-                'field': '出现表格',
-                'description': f'工人在工资表中缺失',
-                'source_a': None,
-                'source_b': None,
-            })
+
+    # ── 反向：考勤表中有、其他三表中没有 ──
+    if attendance_names:
+        three_table_names = {
+            w.get('name') for idx in (registry, salary, payment)
+            for w in idx.values() if w.get('name')
+        }
+        for att_name in attendance_names:
+            if att_name not in three_table_names:
+                issues.append({
+                    'severity': 'warning',
+                    'issue_type': 'cross_table',
+                    'worker_name': att_name,
+                    'id_card': '—',
+                    'field': '出现表格',
+                    'description': f'考勤表中有"{att_name}"，但在支付表/实名制表/支付明细中未找到',
+                    'source_a': '考勤表: 存在',
+                    'source_b': '其他三表: 缺失',
+                })
 
     return issues
 
 
-# ==================== 第二层：联行号核对 ====================
+# ==================== 第二层：联行号核对（三字段全查） ====================
 
 def check_routing_numbers(
     all_id_cards: set,
@@ -307,86 +337,338 @@ def check_routing_numbers(
     bank_db: Session
 ) -> List[Dict[str, Any]]:
     """
-    核对联行号：
-    1. 联行号必须在联号库中存在
-    2. 提交的开户银行名称必须与联号库中的 branch_name 完全一致
+    核对联行号三字段（必须与联号库完全一致）：
+    1. 收款银行联行号：必须在联号库中存在
+    2. 收款方开户行名称（bank_name）：必须与联号库 branch_name 完全一致
+    3. 收款方银行名称（bank_inst_name，仅支付明细表有此字段）：必须与联号库 institution_name 完全一致
     """
     issues = []
 
-    # 收集所有联行号（附带工人信息，同一联行号可能多个工人，只记录一次去查库）
-    # key: routing_number, value: list of worker info
-    routing_workers: Dict[str, List[Dict]] = {}
+    # 收集每个工人的联行号相关数据（每人只收集一次）
+    worker_routing_data = []
 
     for id_card in all_id_cards:
-        worker_name = None
-        for data_dict in (registry, salary, payment):
-            data = data_dict.get(id_card, {})
-            if not worker_name:
-                worker_name = data.get('name')
-            routing = data.get('routing_number')
-            bank_name = data.get('bank_name', '')
-            if routing:
-                if routing not in routing_workers:
-                    routing_workers[routing] = []
-                routing_workers[routing].append({
-                    'id_card': id_card,
-                    'name': worker_name or '未知',
-                    'bank_name': bank_name,
-                })
+        r = registry.get(id_card, {})
+        s = salary.get(id_card, {})
+        p = payment.get(id_card, {})
 
-    if not routing_workers:
+        name = r.get('name') or s.get('name') or p.get('name') or '未知'
+
+        # 联行号：三表应一致，取第一个有值的
+        routing = r.get('routing_number') or s.get('routing_number') or p.get('routing_number')
+        if not routing:
+            continue
+
+        # 开户行名称（branch_name 对应字段）：来自任意表
+        bank_name = r.get('bank_name') or s.get('bank_name') or p.get('bank_name') or ''
+
+        # 收款方银行名称（institution_name 对应字段）：仅支付明细表有此字段
+        bank_inst_name = p.get('bank_inst_name', '')
+
+        worker_routing_data.append({
+            'id_card': id_card,
+            'name': name,
+            'routing': routing,
+            'bank_name': bank_name,
+            'bank_inst_name': bank_inst_name,
+        })
+
+    if not worker_routing_data:
         return issues
 
-    # 批量查询联号库，同时取出 branch_name
-    routing_list = list(routing_workers.keys())
-    routing_db_map: Dict[str, str] = {}  # routing_number -> branch_name
+    # 批量查询联号库，取出 branch_name 和 institution_name
+    all_routings = {w['routing'] for w in worker_routing_data}
+    routing_db_map: Dict[str, Dict[str, str]] = {}  # routing -> {branch_name, institution_name}
 
+    routing_list = list(all_routings)
     chunk_size = 500
     for i in range(0, len(routing_list), chunk_size):
         chunk = routing_list[i:i + chunk_size]
-        results = bank_db.query(BankRouting.routing_number, BankRouting.branch_name).filter(
-            BankRouting.routing_number.in_(chunk)
-        ).all()
-        for r in results:
-            routing_db_map[r[0]] = r[1] or ''
+        results = bank_db.query(
+            BankRouting.routing_number,
+            BankRouting.branch_name,
+            BankRouting.institution_name,
+        ).filter(BankRouting.routing_number.in_(chunk)).all()
+        for row in results:
+            routing_db_map[row[0]] = {
+                'branch_name':    row[1] or '',
+                'institution_name': row[2] or '',
+            }
 
     # 逐个工人校验
-    for routing, workers in routing_workers.items():
+    for w in worker_routing_data:
+        routing = w['routing']
+        name = w['name']
+        id_card = w['id_card']
+
         if routing not in routing_db_map:
-            # 联行号在库中不存在
-            for w in workers:
-                issues.append({
-                    'severity': 'error',
-                    'issue_type': 'bank_routing',
-                    'worker_name': w['name'],
-                    'id_card': w['id_card'],
-                    'field': '联行号',
-                    'description': f'联行号 {routing} 在联号库中找不到对应记录',
-                    'source_a': f'联行号: {routing}',
-                    'source_b': f'提交银行名称: {w["bank_name"] or "未填写"}',
-                })
-        else:
-            db_branch_name = routing_db_map[routing]
-            for w in workers:
-                submitted_bank = w['bank_name']
-                if not submitted_bank:
-                    continue
-                if submitted_bank != db_branch_name:
-                    issues.append({
-                        'severity': 'error',
-                        'issue_type': 'bank_routing',
-                        'worker_name': w['name'],
-                        'id_card': w['id_card'],
-                        'field': '开户银行',
-                        'description': f'开户银行名称与联号库不一致',
-                        'source_a': f'提交填写: {submitted_bank}',
-                        'source_b': f'联号库标准名称: {db_branch_name}',
-                    })
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'bank_routing',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '联行号',
+                'description': f'联行号 {routing} 在联号库中找不到对应记录',
+                'source_a': f'联行号: {routing}',
+                'source_b': f'提交银行名称: {w["bank_name"] or "未填写"}',
+            })
+            continue
+
+        db_info = routing_db_map[routing]
+
+        # 校验 开户行名称 vs branch_name
+        if w['bank_name'] and w['bank_name'] != db_info['branch_name']:
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'bank_routing',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '开户行名称',
+                'description': '开户行名称与联号库不一致',
+                'source_a': f'提交填写: {w["bank_name"]}',
+                'source_b': f'联号库标准名称: {db_info["branch_name"]}',
+            })
+
+        # 校验 收款方银行名称 vs institution_name（仅当支付明细表提供了该字段）
+        if w['bank_inst_name'] and w['bank_inst_name'] != db_info['institution_name']:
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'bank_routing',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '收款方银行名称',
+                'description': '收款方银行名称（机构全称）与联号库不一致',
+                'source_a': f'支付明细填写: {w["bank_inst_name"]}',
+                'source_b': f'联号库机构全称: {db_info["institution_name"]}',
+            })
 
     return issues
 
 
-# ==================== 第三层：历史数据核对 ====================
+# ==================== 第三层：BIN码核查 ====================
+
+# 银行卡BIN前缀映射（6位前缀 -> 银行简称关键词）
+# 从长到短排列，优先匹配最具体的前缀
+_BIN_BANK_KEYWORDS: List[Tuple[str, str]] = [
+    # 农业银行（最具区分性的前缀放最前）
+    ('9559',   '农业银行'),
+    ('622841', '农业银行'), ('622848', '农业银行'), ('622849', '农业银行'),
+    ('623018', '农业银行'), ('623019', '农业银行'),
+    # 工商银行
+    ('622202', '工商银行'), ('622203', '工商银行'), ('622208', '工商银行'),
+    ('622209', '工商银行'), ('621226', '工商银行'), ('621227', '工商银行'),
+    ('621228', '工商银行'),
+    # 建设银行
+    ('621700', '建设银行'), ('436742', '建设银行'), ('621799', '建设银行'),
+    ('621284', '建设银行'), ('625362', '建设银行'), ('625975', '建设银行'),
+    # 中国银行
+    ('621660', '中国银行'), ('621661', '中国银行'), ('621662', '中国银行'),
+    ('621663', '中国银行'), ('622760', '中国银行'), ('622761', '中国银行'),
+    # 邮政储蓄银行
+    ('621096', '邮政储蓄'), ('621098', '邮政储蓄'), ('621099', '邮政储蓄'),
+    ('622150', '邮政储蓄'), ('622151', '邮政储蓄'), ('622188', '邮政储蓄'),
+    ('621218', '邮政储蓄'), ('623218', '邮政储蓄'),
+    # 交通银行
+    ('622260', '交通银行'), ('622261', '交通银行'), ('622262', '交通银行'),
+    ('622263', '交通银行'), ('622264', '交通银行'), ('622265', '交通银行'),
+    # 招商银行
+    ('622580', '招商银行'), ('622588', '招商银行'), ('621483', '招商银行'),
+    ('625383', '招商银行'),
+]
+
+def _get_bin_bank_keyword(card_number: str) -> Optional[str]:
+    """根据银行卡号前缀返回银行简称关键词，无法识别返回None"""
+    for prefix, keyword in _BIN_BANK_KEYWORDS:
+        if card_number.startswith(prefix):
+            return keyword
+    return None
+
+
+def check_bin_codes(
+    all_id_cards: set,
+    registry: Dict[str, Dict],
+    salary: Dict[str, Dict],
+    payment: Dict[str, Dict],
+) -> List[Dict[str, Any]]:
+    """
+    BIN码核查：银行卡号前缀所对应银行，必须与开户行名称中的银行一致。
+    例如：卡号BIN识别为农业银行，但开户行填写了建设银行，即为错误。
+    注：BIN库不完整，无法识别的卡号不予报错（跳过）。
+    """
+    issues = []
+
+    for id_card in all_id_cards:
+        r = registry.get(id_card, {})
+        s = salary.get(id_card, {})
+        p = payment.get(id_card, {})
+
+        name = r.get('name') or s.get('name') or p.get('name') or '未知'
+
+        # 银行卡号（优先取实名制表，其次工资表，再次支付明细）
+        bank_card = r.get('bank_card') or s.get('bank_card') or p.get('bank_card') or ''
+        if not bank_card:
+            continue
+
+        card_str = str(bank_card).replace(' ', '')
+        bin_keyword = _get_bin_bank_keyword(card_str)
+        if not bin_keyword:
+            continue  # 无法识别BIN，跳过
+
+        # 收集所有表中的开户行名称进行比对
+        bank_names = {}
+        for src, data in [('实名制表', r), ('工资表', s), ('支付明细', p)]:
+            bn = data.get('bank_name') or data.get('bank_inst_name') or ''
+            if bn:
+                bank_names[src] = bn
+
+        for src, bn in bank_names.items():
+            if bin_keyword not in bn:
+                issues.append({
+                    'severity': 'error',
+                    'issue_type': 'bin_mismatch',
+                    'worker_name': name,
+                    'id_card': id_card,
+                    'field': '银行卡/开户行',
+                    'description': (
+                        f'银行卡号BIN识别为{bin_keyword}，'
+                        f'但{src}中开户行填写为"{bn}"，两者不符'
+                    ),
+                    'source_a': f'卡号BIN({card_str[:6]}...): {bin_keyword}',
+                    'source_b': f'{src}开户行: {bn}',
+                })
+
+    return issues
+
+
+# ==================== 第四层：工资金额逻辑核查 ====================
+
+def check_salary_logic(
+    all_id_cards: set,
+    salary: Dict[str, Dict],
+    payment: Dict[str, Dict],
+) -> List[Dict[str, Any]]:
+    """
+    工资金额逻辑核查：
+    1. 应发工资 - 代扣/代缴 = 实发工资（工资表内部一致性）
+    2. 支付明细表金额 = 实发工资（跨表一致性）
+    允许±1元的四舍五入误差。
+    """
+    issues = []
+    TOLERANCE = 1.0  # 允许误差1元
+
+    for id_card in all_id_cards:
+        s = salary.get(id_card, {})
+        p = payment.get(id_card, {})
+
+        name = s.get('name') or p.get('name') or '未知'
+
+        # 从工资表取金额字段
+        gross   = s.get('gross_salary')   # 应发工资
+        deduct  = s.get('deduction', 0)   # 代扣/代缴（可为0）
+        net_sal = s.get('net_salary')     # 实发工资
+
+        # 从支付明细取实付金额
+        paid    = p.get('amount')         # 支付金额
+
+        try:
+            gross   = float(gross)   if gross   is not None else None
+            deduct  = float(deduct)  if deduct  is not None else 0.0
+            net_sal = float(net_sal) if net_sal is not None else None
+            paid    = float(paid)    if paid    is not None else None
+        except (TypeError, ValueError):
+            continue
+
+        # 检查1：应发 - 代扣 = 实发
+        if gross is not None and net_sal is not None:
+            expected_net = gross - deduct
+            if abs(expected_net - net_sal) > TOLERANCE:
+                issues.append({
+                    'severity': 'error',
+                    'issue_type': 'salary_logic',
+                    'worker_name': name,
+                    'id_card': id_card,
+                    'field': '工资金额',
+                    'description': (
+                        f'应发({gross}) - 代扣({deduct}) = {expected_net:.2f}，'
+                        f'但实发工资填写为 {net_sal}，差额 {abs(expected_net - net_sal):.2f} 元'
+                    ),
+                    'source_a': f'工资表: 应发{gross} - 代扣{deduct} = {expected_net:.2f}',
+                    'source_b': f'工资表实发: {net_sal}',
+                })
+
+        # 检查2：支付明细金额 = 实发工资
+        if paid is not None and net_sal is not None:
+            if abs(paid - net_sal) > TOLERANCE:
+                issues.append({
+                    'severity': 'error',
+                    'issue_type': 'salary_logic',
+                    'worker_name': name,
+                    'id_card': id_card,
+                    'field': '支付金额',
+                    'description': (
+                        f'支付明细金额({paid})与工资表实发工资({net_sal})不一致，'
+                        f'差额 {abs(paid - net_sal):.2f} 元'
+                    ),
+                    'source_a': f'支付明细: {paid}',
+                    'source_b': f'工资表实发: {net_sal}',
+                })
+
+    return issues
+
+
+# ==================== 第五层：出勤天数一致性核查 ====================
+
+def check_attendance_consistency(
+    all_id_cards: set,
+    salary: Dict[str, Dict],
+    attendance_by_name: Dict[str, Dict],
+) -> List[Dict[str, Any]]:
+    """
+    出勤天数核查：考勤表出勤工日 必须与 工资表出勤天数 一致。
+    考勤表以姓名为key，工资表以身份证为key。
+    """
+    issues = []
+
+    for id_card in all_id_cards:
+        s = salary.get(id_card, {})
+        name = s.get('name', '')
+        if not name:
+            continue
+
+        att = attendance_by_name.get(name, {})
+        if not att:
+            continue  # 人员不在考勤表中，已由 check_cross_tables 报告
+
+        days_salary = s.get('days_attended')     # 工资表出勤天数
+        days_att    = att.get('days_attended')    # 考勤表出勤工日
+
+        try:
+            days_salary = float(days_salary) if days_salary is not None else None
+            days_att    = float(days_att)    if days_att    is not None else None
+        except (TypeError, ValueError):
+            continue
+
+        if days_salary is None or days_att is None:
+            continue
+
+        if days_salary != days_att:
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'attendance',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '出勤天数',
+                'description': (
+                    f'考勤表出勤工日({days_att})与工资表出勤天数({days_salary})不一致'
+                ),
+                'source_a': f'考勤表: {days_att}天',
+                'source_b': f'工资表: {days_salary}天',
+            })
+
+    return issues
+
+
+# ==================== 第六层：历史数据核对 ====================
 
 def check_history(
     all_id_cards: set,

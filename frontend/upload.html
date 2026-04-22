@@ -356,6 +356,15 @@
                     <div class="file-desc">Excel格式（非必须）<br>（收款方名称、账号、联行号、金额）</div>
                     <div class="file-status pending" id="status-payment">点击或拖拽上传文件（可选）</div>
                 </div>
+
+                <!-- 考勤表 -->
+                <div class="file-box" id="box-attendance">
+                    <input type="file" id="file-attendance" accept=".xlsx,.xls" onchange="handleFileChange('attendance', this)">
+                    <div class="file-icon">📅</div>
+                    <div class="file-type-label">月度考勤表</div>
+                    <div class="file-desc">Excel格式（非必须）<br>（姓名、出勤工日）</div>
+                    <div class="file-status pending" id="status-attendance">点击或拖拽上传文件（可选）</div>
+                </div>
             </div>
 
             <div class="btn-group">
@@ -507,9 +516,10 @@
 
         const file = input.files[0];
         const fileTypeMap = {
-            registry: '实名制表',
-            salary: '工资表',
-            payment: '支付明细',
+            registry:   '实名制表',
+            salary:     '工资表',
+            payment:    '支付明细',
+            attendance: '考勤表',
         };
         const fileType = fileTypeMap[fileKey];
 

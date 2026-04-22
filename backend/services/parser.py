@@ -284,12 +284,20 @@ def _extract_header_hints(header_rows: List[List[str]], col_count: int) -> Dict[
         '收款人': 'name',
         '开户银行': 'bank_name',
         '开户行': 'bank_name',
+        '收款方开户行名称': 'bank_name',
         '收款方开户行': 'bank_name',
-        '收款方银行': 'bank_name',
-        '实发': 'amount',
-        '实发工资': 'amount',
+        '收款方银行名称': 'bank_inst_name',   # 机构全称（支付明细专用列）
         '支付金额': 'amount',
         '金额': 'amount',
+        '实发工资': 'net_salary',             # 工资表实发，独立字段
+        '实发': 'net_salary',
+        '应发工资': 'gross_salary',
+        '应发': 'gross_salary',
+        '代扣': 'deduction',
+        '代缴': 'deduction',
+        '出勤工日': 'days_attended',
+        '出勤天数': 'days_attended',
+        '出勤': 'days_attended',
     }
 
     # 取最后一行表头（最接近数据的那行）
@@ -307,7 +315,8 @@ def _extract_header_hints(header_rows: List[List[str]], col_count: int) -> Dict[
 
 def _build_worker_records(
     data_rows: List[List[str]],
-    col_types: Dict[int, Dict[str, Any]]
+    col_types: Dict[int, Dict[str, Any]],
+    require_id_card: bool = True,
 ) -> List[Dict[str, Any]]:
     """根据列类型映射，构建工人记录列表"""
     workers = []
@@ -342,21 +351,42 @@ def _build_worker_records(
                 record['name'] = cell
             elif ft == 'bank_name' and 'bank_name' not in record and cell:
                 record['bank_name'] = cell
+            elif ft == 'bank_inst_name' and 'bank_inst_name' not in record and cell:
+                record['bank_inst_name'] = cell
             elif ft == 'amount' and 'amount' not in record and is_amount(cell):
                 record['amount'] = float(cell.replace(',', ''))
+            elif ft == 'net_salary' and 'net_salary' not in record and is_amount(cell):
+                record['net_salary'] = float(cell.replace(',', ''))
+            elif ft == 'gross_salary' and 'gross_salary' not in record and is_amount(cell):
+                record['gross_salary'] = float(cell.replace(',', ''))
+            elif ft == 'deduction' and 'deduction' not in record and is_amount(cell):
+                record['deduction'] = float(cell.replace(',', ''))
+            elif ft == 'days_attended' and 'days_attended' not in record:
+                try:
+                    v = float(cell.replace(',', ''))
+                    if 0 <= v <= 31:  # 出勤天数不超过31天
+                        record['days_attended'] = v
+                except ValueError:
+                    pass
 
-        # 必须有身份证才算有效记录
-        if 'id_card' in record:
+        if require_id_card:
+            # 必须有身份证才算有效记录
+            if 'id_card' not in record:
+                continue
             # 尝试从相邻列补充未识别的名字
             if 'name' not in record:
                 name = _find_name_near_idcard(row, col_types)
                 if name:
                     record['name'] = name
+            # 尝试从表格文字中提取银行名称（后备方案）
+            if 'bank_name' not in record:
+                record['bank_name'] = _find_bank_name(row, col_types)
+        else:
+            # 无需身份证（如考勤表），必须有姓名
+            if 'name' not in record:
+                continue
 
-            # 尝试从表格文字中提取银行名称
-            record['bank_name'] = _find_bank_name(row, col_types)
-
-            workers.append(record)
+        workers.append(record)
 
     return workers
 
@@ -528,6 +558,121 @@ def _expand_merged_cells(ws) -> List[List[Any]]:
     return rows
 
 
+# ==================== 考勤表专用解析 ====================
+
+def parse_attendance_file(file_path: str) -> List[Dict[str, Any]]:
+    """
+    解析考勤表（Excel格式）：不含身份证，以姓名+出勤工日为主要字段。
+    策略：找到"出勤工日"或"出勤天数"等列，提取姓名和出勤天数。
+    """
+    suffix = Path(file_path).suffix.lower()
+    if suffix not in ('.xlsx', '.xls'):
+        return []
+
+    try:
+        if suffix == '.xls':
+            import xlrd
+            wb = xlrd.open_workbook(file_path)
+            sheets_data = []
+            for sheet in wb.sheets():
+                rows = []
+                for i in range(sheet.nrows):
+                    row = []
+                    for j in range(sheet.ncols):
+                        cell = sheet.cell(i, j)
+                        if cell.ctype == 2:
+                            v = cell.value
+                            row.append(str(int(v)) if v == int(v) else str(v))
+                        elif cell.ctype == 0:
+                            row.append('')
+                        else:
+                            row.append(str(cell.value).strip())
+                    rows.append(row)
+                sheets_data.append(rows)
+        else:
+            import openpyxl
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            sheets_data = []
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                raw = _expand_merged_cells(ws)
+                rows = [[normalize_cell(c) for c in row] for row in raw]
+                sheets_data.append(rows)
+    except Exception as e:
+        logger.warning(f"考勤表打开失败 {file_path}: {e}")
+        return []
+
+    workers = []
+    for rows in sheets_data:
+        if not rows:
+            continue
+
+        # 找包含"出勤"关键字的表头行
+        header_row_idx = None
+        name_col = None
+        days_col = None
+        for i, row in enumerate(rows):
+            for j, cell in enumerate(row):
+                c = normalize_cell(str(cell)) if cell else ''
+                if '出勤' in c and ('工日' in c or '天数' in c or '天' in c):
+                    days_col = j
+                    header_row_idx = i
+                elif '姓名' in c and name_col is None:
+                    name_col = j
+            if header_row_idx is not None and name_col is not None and days_col is not None:
+                break
+
+        if header_row_idx is None or name_col is None or days_col is None:
+            # 后备：用智能识别
+            header_rows_hint = rows[:5] if len(rows) > 5 else rows
+            col_hints = _extract_header_hints(header_rows_hint, max(len(r) for r in rows) if rows else 0)
+            # 找 days_attended 列
+            for col_idx, ft in col_hints.items():
+                if ft == 'days_attended':
+                    days_col = col_idx
+                elif ft == 'name':
+                    name_col = col_idx
+            # 找数据起始行（有中文名字的第一行）
+            data_start = 0
+            for i, row in enumerate(rows):
+                if name_col is not None and name_col < len(row):
+                    cell = normalize_cell(str(row[name_col]))
+                    if is_chinese_name(cell):
+                        data_start = i
+                        break
+            if name_col is None or days_col is None:
+                continue
+            data_rows = rows[data_start:]
+        else:
+            data_rows = rows[header_row_idx + 1:]
+
+        for row in data_rows:
+            if not row:
+                continue
+            name_cell = normalize_cell(str(row[name_col])) if name_col < len(row) else ''
+            days_cell = normalize_cell(str(row[days_col])) if days_col < len(row) else ''
+
+            if not is_chinese_name(name_cell):
+                continue
+            try:
+                days = float(days_cell.replace(',', ''))
+                if not (0 <= days <= 31):
+                    continue
+            except (ValueError, TypeError):
+                continue
+
+            workers.append({'name': name_cell, 'days_attended': days})
+
+    # 去重（以姓名为key，保留第一条）
+    seen_names = set()
+    unique = []
+    for w in workers:
+        if w['name'] not in seen_names:
+            seen_names.add(w['name'])
+            unique.append(w)
+    return unique
+
+
 # ==================== 统一入口 ====================
 
 def parse_file(file_path: str, file_type_hint: str = '') -> Dict[str, Any]:
@@ -541,6 +686,15 @@ def parse_file(file_path: str, file_type_hint: str = '') -> Dict[str, Any]:
     suffix = path.suffix.lower()
 
     try:
+        # 考勤表：无身份证，用专用解析器
+        if file_type_hint == '考勤表':
+            workers = parse_attendance_file(file_path)
+            return {
+                'workers': workers,
+                'error': None,
+                'raw_count': len(workers)
+            }
+
         if suffix == '.docx':
             workers = parse_word_file(file_path)
         elif suffix in ('.xlsx', '.xls'):
