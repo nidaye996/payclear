@@ -48,6 +48,7 @@ def run_check(
     salary_data: List[Dict] = []     # 工资表
     payment_data: List[Dict] = []    # 支付明细
     attendance_data: List[Dict] = [] # 考勤表
+    station_meeting: Dict = {}        # 站班会数据
 
     for f in files:
         if not f.parsed_data:
@@ -66,6 +67,12 @@ def run_check(
             payment_data = workers
         elif f.file_type == '考勤表':
             attendance_data = workers
+        elif f.file_type == '站班会数据':
+            try:
+                parsed_full = json.loads(f.parsed_data)
+                station_meeting = parsed_full.get('station_meeting', {})
+            except Exception:
+                pass
 
     # 构建索引（以身份证为key）
     registry_index  = {w['id_card']: w for w in registry_data  if w.get('id_card')}
@@ -105,7 +112,11 @@ def run_check(
     if attendance_by_name:
         issues.extend(check_attendance_consistency(all_id_cards, salary_index, attendance_by_name))
 
-    # 第六层：历史数据核对
+    # 第六层：站班会核查（考勤表 vs 站班会原始记录）
+    if station_meeting and attendance_by_name:
+        issues.extend(check_station_meeting(attendance_by_name, station_meeting))
+
+    # 第七层：历史数据核对
     issues.extend(check_history(
         all_id_cards, registry_index, salary_index,
         submission.team_id, submission.year, submission.month, db,
@@ -668,7 +679,77 @@ def check_attendance_consistency(
     return issues
 
 
-# ==================== 第六层：历史数据核对 ====================
+# ==================== 第六层：站班会核查 ====================
+
+def check_station_meeting(
+    attendance_by_name: Dict[str, Dict],
+    station_meeting: Dict,
+) -> List[Dict[str, Any]]:
+    """
+    站班会核查：以考勤表为基准，逐人比对站班会中的出勤次数。
+    - 考勤天数 == 站班会统计天数 → 正常
+    - 考勤天数 != 站班会统计天数 → 错误
+    - 站班会中找不到此人 → 警告（姓名对不上或考勤有误）
+    - 同一人同一天在站班会中出现多次 → 警告（站班会数据异常）
+    """
+    issues = []
+    sm_attendance: Dict[str, int] = station_meeting.get('attendance_by_name', {})
+    sm_duplicates: Dict[str, list] = station_meeting.get('duplicate_days', {})
+
+    # 先报站班会自身重复的问题
+    for name, dup_dates in sm_duplicates.items():
+        issues.append({
+            'severity': 'warning',
+            'issue_type': 'station_meeting',
+            'worker_name': name,
+            'id_card': '',
+            'field': '站班会数据',
+            'description': f'站班会中"{name}"在以下日期重复出现，数据可能有误：{", ".join(dup_dates)}',
+            'source_a': '站班会: 重复记录',
+            'source_b': None,
+        })
+
+    # 逐人核查
+    for name, att_info in attendance_by_name.items():
+        days_att = att_info.get('days_attended')
+        try:
+            days_att = float(days_att) if days_att is not None else None
+        except (TypeError, ValueError):
+            days_att = None
+
+        if days_att is None:
+            continue
+
+        if name not in sm_attendance:
+            issues.append({
+                'severity': 'warning',
+                'issue_type': 'station_meeting',
+                'worker_name': name,
+                'id_card': '',
+                'field': '出勤天数',
+                'description': f'考勤表记录"{name}"出勤{days_att}天，但在站班会中未找到此人，请核实姓名是否填写有误',
+                'source_a': f'考勤表: {days_att}天',
+                'source_b': '站班会: 未找到',
+            })
+            continue
+
+        days_sm = float(sm_attendance[name])
+        if days_att != days_sm:
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'station_meeting',
+                'worker_name': name,
+                'id_card': '',
+                'field': '出勤天数',
+                'description': f'考勤表出勤天数({int(days_att)}天)与站班会统计天数({int(days_sm)}天)不一致',
+                'source_a': f'考勤表: {int(days_att)}天',
+                'source_b': f'站班会: {int(days_sm)}天',
+            })
+
+    return issues
+
+
+# ==================== 第七层：历史数据核对 ====================
 
 def check_history(
     all_id_cards: set,

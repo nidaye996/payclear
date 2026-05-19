@@ -365,6 +365,15 @@
                     <div class="file-desc">Excel格式（非必须）<br>（姓名、出勤工日）</div>
                     <div class="file-status pending" id="status-attendance">点击或拖拽上传文件（可选）</div>
                 </div>
+
+                <!-- 站班会数据 -->
+                <div class="file-box" id="box-station">
+                    <input type="file" id="file-station" accept=".xlsx,.xls" onchange="handleFileChange('station', this)">
+                    <div class="file-icon">📋</div>
+                    <div class="file-type-label">站班会列表数据</div>
+                    <div class="file-desc">Excel格式（非必须）<br>（原始出勤记录，用于核验考勤表）</div>
+                    <div class="file-status pending" id="status-station">点击或拖拽上传文件（可选）</div>
+                </div>
             </div>
 
             <div class="btn-group">
@@ -520,6 +529,7 @@
             salary:     '工资表',
             payment:    '支付明细',
             attendance: '考勤表',
+            station:    '站班会数据',
         };
         const fileType = fileTypeMap[fileKey];
 

@@ -673,6 +673,98 @@ def parse_attendance_file(file_path: str) -> List[Dict[str, Any]]:
     return unique
 
 
+# ==================== 站班会数据专用解析 ====================
+
+def parse_station_meeting_file(file_path: str) -> Dict[str, Any]:
+    """
+    解析站班会列表数据（Excel格式）。
+    返回：
+      {
+        'attendance_by_name': {姓名: 出勤天数},   # 按日期去重后的出勤次数
+        'duplicate_days': {姓名: [重复日期列表]},  # 同一人同一天出现多次的情况
+      }
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+    except Exception as e:
+        logger.warning(f"站班会文件打开失败 {file_path}: {e}")
+        return {'attendance_by_name': {}, 'duplicate_days': {}}
+
+    if not rows:
+        return {'attendance_by_name': {}, 'duplicate_days': {}}
+
+    # 找表头行，定位"施工日期"、"班组负责人"、"其他施工人员"列
+    header_idx = None
+    date_col = leader_col = others_col = None
+    for i, row in enumerate(rows):
+        for j, cell in enumerate(row):
+            v = str(cell or '').strip()
+            if '施工日期' in v:
+                date_col = j; header_idx = i
+            elif '班组负责人' in v:
+                leader_col = j
+            elif '其他施工人员' in v:
+                others_col = j
+
+    if header_idx is None or date_col is None:
+        return {'attendance_by_name': {}, 'duplicate_days': {}}
+
+    # name -> {date -> count}
+    name_date_count: Dict[str, Dict[str, int]] = {}
+
+    def add_name(name: str, date_str: str):
+        name = name.strip().strip('（）()').strip()
+        # 去掉括号内备注，如"张益铭（退场）"→"张益铭"
+        import re
+        name = re.sub(r'[（(][^）)]*[）)]', '', name).strip()
+        if not name or len(name) < 2:
+            return
+        if name not in name_date_count:
+            name_date_count[name] = {}
+        name_date_count[name][date_str] = name_date_count[name].get(date_str, 0) + 1
+
+    for row in rows[header_idx + 1:]:
+        if not row:
+            continue
+        date_val = row[date_col] if date_col < len(row) else None
+        if date_val is None:
+            continue
+        # 统一日期为字符串
+        if hasattr(date_val, 'strftime'):
+            date_str = date_val.strftime('%Y-%m-%d')
+        else:
+            date_str = str(date_val).strip()[:10]
+        if not date_str or date_str == 'None':
+            continue
+
+        # 班组负责人
+        if leader_col is not None and leader_col < len(row):
+            for name in str(row[leader_col] or '').split(','):
+                add_name(name, date_str)
+
+        # 其他施工人员
+        if others_col is not None and others_col < len(row):
+            for name in str(row[others_col] or '').split(','):
+                add_name(name, date_str)
+
+    attendance_by_name: Dict[str, int] = {}
+    duplicate_days: Dict[str, list] = {}
+
+    for name, date_count in name_date_count.items():
+        dups = [d for d, cnt in date_count.items() if cnt > 1]
+        if dups:
+            duplicate_days[name] = dups
+        attendance_by_name[name] = len(date_count)  # 按日期去重后的天数
+
+    return {
+        'attendance_by_name': attendance_by_name,
+        'duplicate_days': duplicate_days,
+    }
+
+
 # ==================== 统一入口 ====================
 
 def parse_file(file_path: str, file_type_hint: str = '') -> Dict[str, Any]:
@@ -693,6 +785,16 @@ def parse_file(file_path: str, file_type_hint: str = '') -> Dict[str, Any]:
                 'workers': workers,
                 'error': None,
                 'raw_count': len(workers)
+            }
+
+        # 站班会数据：专用解析器，返回格式特殊
+        if file_type_hint == '站班会数据':
+            result = parse_station_meeting_file(file_path)
+            return {
+                'workers': [],  # 站班会不产生 worker 列表
+                'station_meeting': result,
+                'error': None,
+                'raw_count': len(result.get('attendance_by_name', {}))
             }
 
         if suffix == '.docx':

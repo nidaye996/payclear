@@ -201,6 +201,10 @@
                             <option value="">全部类型</option>
                             <option value="cross_table">三表核对</option>
                             <option value="bank_routing">联行号核对</option>
+                            <option value="bin_mismatch">BIN码核查</option>
+                            <option value="salary_logic">工资金额核查</option>
+                            <option value="attendance">出勤天数核查</option>
+                            <option value="station_meeting">站班会核查</option>
                             <option value="history">历史数据</option>
                         </select>
                         <input type="text" id="filter-search" placeholder="搜索姓名或身份证" oninput="renderIssues()">
@@ -244,9 +248,13 @@
     let allIssues = [];
 
     const typeMap = {
-        cross_table: '三表核对',
-        bank_routing: '联行号核对',
-        history: '历史数据',
+        cross_table:     '三表核对',
+        bank_routing:    '联行号核对',
+        bin_mismatch:    'BIN码核查',
+        salary_logic:    '工资金额核查',
+        attendance:      '出勤天数核查',
+        station_meeting: '站班会核查',
+        history:         '历史数据',
     };
 
     const severityMap = {
