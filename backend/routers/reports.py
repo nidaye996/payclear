@@ -96,16 +96,35 @@ def get_report(
 @router.delete("/{report_id}")
 def delete_report(
     report_id: int,
+    with_submission: bool = Query(False, description="同时删除原始提交和文件"),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """删除核对报告（仅管理员）"""
+    import shutil
     report = db.query(CheckReport).filter(CheckReport.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
-    db.delete(report)
+
+    if with_submission:
+        submission = db.query(MonthlySubmission).filter(
+            MonthlySubmission.id == report.submission_id
+        ).first()
+        if submission:
+            # 删除磁盘文件
+            upload_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "data", "uploads", str(submission.id)
+            )
+            if os.path.exists(upload_dir):
+                shutil.rmtree(upload_dir)
+            db.delete(submission)  # 级联删除报告和文件记录
+        else:
+            db.delete(report)
+    else:
+        db.delete(report)
+
     db.commit()
-    return {"message": "报告已删除"}
+    return {"message": "删除成功"}
 
 
 @router.get("/{report_id}/export")

@@ -98,6 +98,19 @@
         .btn-danger-sm { background: transparent; border: none; color: #dc3545; font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: opacity 0.15s; }
         .report-list-item:hover .btn-danger-sm { opacity: 1; }
 
+        /* 删除确认弹窗 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:white; border-radius:12px; padding:28px 32px; width:380px; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+        .modal-title { font-size:16px; font-weight:700; color:#1a3a5c; margin-bottom:10px; }
+        .modal-desc { font-size:13px; color:#555; line-height:1.6; margin-bottom:18px; }
+        .modal-option { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid #eee; border-radius:8px; margin-bottom:10px; cursor:pointer; transition:all 0.15s; }
+        .modal-option:hover { border-color:#dc3545; background:#fff5f5; }
+        .modal-option input[type=checkbox] { width:16px; height:16px; accent-color:#dc3545; cursor:pointer; }
+        .modal-option label { font-size:13px; color:#333; cursor:pointer; line-height:1.5; }
+        .modal-option label strong { color:#dc3545; }
+        .modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+
         .empty-state { text-align: center; padding: 60px; color: #aaa; }
         .empty-state .icon { font-size: 64px; display: block; margin-bottom: 16px; }
 
@@ -202,6 +215,22 @@
             </div>
         </div>
     </main>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="delete-modal">
+    <div class="modal-box">
+        <div class="modal-title">删除核对报告</div>
+        <div class="modal-desc">报告删除后无法恢复，请选择删除范围：</div>
+        <div class="modal-option" onclick="document.getElementById('cb-with-files').click()">
+            <input type="checkbox" id="cb-with-files">
+            <label for="cb-with-files">同时删除<strong>原始提交文件</strong><br><span style="color:#888;font-size:12px">（实名制表、工资表、支付明细等上传文件将一并清除）</span></label>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background:#f0f0f0;color:#333" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" onclick="doDelete()">确认删除</button>
+        </div>
+    </div>
 </div>
 
 <script src="/static/js/api.js"></script>
@@ -382,15 +411,27 @@
         `;
     }
 
-    async function confirmDeleteReport(reportId) {
-        const report = allReports.find(r => r.id === reportId);
-        if (!report) return;
-        if (!confirm('确认删除这份核对报告？\n\n删除后无法恢复，但原始提交文件不受影响。')) return;
+    let _pendingDeleteId = null;
+
+    function confirmDeleteReport(reportId) {
+        _pendingDeleteId = reportId;
+        document.getElementById('cb-with-files').checked = false;
+        document.getElementById('delete-modal').classList.add('show');
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('delete-modal').classList.remove('show');
+        _pendingDeleteId = null;
+    }
+
+    async function doDelete() {
+        if (!_pendingDeleteId) return;
+        const withFiles = document.getElementById('cb-with-files').checked;
+        closeDeleteModal();
         try {
-            await deleteReport(reportId);
-            showToast('报告已删除', 'success');
-            // 如果当前正在查看该报告，关闭详情
-            if (currentReport && currentReport.id === reportId) {
+            await deleteReport(_pendingDeleteId, withFiles);
+            showToast(withFiles ? '报告及原始文件已删除' : '报告已删除', 'success');
+            if (currentReport && currentReport.id === _pendingDeleteId) {
                 currentReport = null;
                 document.getElementById('report-detail').style.display = 'none';
                 document.getElementById('detail-placeholder').style.display = 'block';

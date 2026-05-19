@@ -230,8 +230,8 @@ async function getReport(reportId) {
     return await api.get(`/reports/${reportId}`);
 }
 
-async function deleteReport(reportId) {
-    return await api.delete(`/reports/${reportId}`);
+async function deleteReport(reportId, withSubmission = false) {
+    return await api.delete(`/reports/${reportId}?with_submission=${withSubmission}`);
 }
 
 async function exportReport(reportId) {
