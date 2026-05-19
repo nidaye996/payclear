@@ -93,6 +93,21 @@ def get_report(
     )
 
 
+@router.delete("/{report_id}")
+def delete_report(
+    report_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """删除核对报告（仅管理员）"""
+    report = db.query(CheckReport).filter(CheckReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    db.delete(report)
+    db.commit()
+    return {"message": "报告已删除"}
+
+
 @router.get("/{report_id}/export")
 def export_report_excel(
     report_id: int,

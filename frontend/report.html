@@ -93,6 +93,10 @@
         .btn-primary:hover { background: #1a5485; }
         .btn-success { background: #28a745; color: white; }
         .btn-success:hover { background: #1e7e34; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #b02a37; }
+        .btn-danger-sm { background: transparent; border: none; color: #dc3545; font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: opacity 0.15s; }
+        .report-list-item:hover .btn-danger-sm { opacity: 1; }
 
         .empty-state { text-align: center; padding: 60px; color: #aaa; }
         .empty-state .icon { font-size: 64px; display: block; margin-bottom: 16px; }
@@ -256,13 +260,16 @@
                     ? `<span class="badge badge-ok">✅ 无异常</span>`
                     : '';
 
+                const deleteBtn = isAdmin()
+                    ? `<button class="btn-danger-sm" onclick="event.stopPropagation();confirmDeleteReport(${r.id})" title="删除报告">🗑️</button>`
+                    : '';
                 return `
                     <div class="report-list-item" id="report-item-${r.id}" onclick="selectReport(${r.id})">
-                        <div>
+                        <div style="flex:1;min-width:0">
                             <div style="font-weight:600;font-size:14px">${teamName} · ${period}</div>
                             <div class="report-meta">${formatDate(r.generated_at)} · ${r.total_workers}名工人</div>
                         </div>
-                        <div class="badge-group">${errBadge}${warnBadge}${okBadge}</div>
+                        <div class="badge-group" style="align-items:center">${errBadge}${warnBadge}${okBadge}${deleteBtn}</div>
                     </div>
                 `;
             }).join('');
@@ -373,6 +380,34 @@
                 </table>
             </div>
         `;
+    }
+
+    function isAdmin() {
+        try {
+            const token = getToken();
+            if (!token) return false;
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.role === 'admin' || payload.role === 'operator';
+        } catch { return false; }
+    }
+
+    async function confirmDeleteReport(reportId) {
+        const report = allReports.find(r => r.id === reportId);
+        if (!report) return;
+        if (!confirm('确认删除这份核对报告？\n\n删除后无法恢复，但原始提交文件不受影响。')) return;
+        try {
+            await deleteReport(reportId);
+            showToast('报告已删除', 'success');
+            // 如果当前正在查看该报告，关闭详情
+            if (currentReport && currentReport.id === reportId) {
+                currentReport = null;
+                document.getElementById('report-detail').style.display = 'none';
+                document.getElementById('detail-placeholder').style.display = 'block';
+            }
+            await loadReports();
+        } catch(e) {
+            showToast('删除失败: ' + e.message, 'error');
+        }
     }
 
     async function doExport() {

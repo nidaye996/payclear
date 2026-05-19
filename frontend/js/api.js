@@ -230,6 +230,10 @@ async function getReport(reportId) {
     return await api.get(`/reports/${reportId}`);
 }
 
+async function deleteReport(reportId) {
+    return await api.delete(`/reports/${reportId}`);
+}
+
 async function exportReport(reportId) {
     const token = getToken();
     const response = await fetch(`${API_BASE}/reports/${reportId}/export`, {
