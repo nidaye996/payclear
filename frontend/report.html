@@ -260,7 +260,7 @@
                     ? `<span class="badge badge-ok">✅ 无异常</span>`
                     : '';
 
-                const deleteBtn = isAdmin()
+                const deleteBtn = isAdminOrOperator()
                     ? `<button class="btn-danger-sm" onclick="event.stopPropagation();confirmDeleteReport(${r.id})" title="删除报告">🗑️</button>`
                     : '';
                 return `
@@ -380,15 +380,6 @@
                 </table>
             </div>
         `;
-    }
-
-    function isAdmin() {
-        try {
-            const token = getToken();
-            if (!token) return false;
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.role === 'admin' || payload.role === 'operator';
-        } catch { return false; }
     }
 
     async function confirmDeleteReport(reportId) {
