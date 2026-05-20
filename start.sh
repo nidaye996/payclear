@@ -11,6 +11,25 @@ echo "=================================================="
 echo "   农民工工资核对系统 - 启动脚本"
 echo "=================================================="
 
+# 安装系统依赖（tesseract OCR，用于识别用工协议PDF）
+if ! command -v tesseract &> /dev/null; then
+    echo "📦 安装 tesseract OCR..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-chi-sim
+    elif command -v brew &> /dev/null; then
+        brew install tesseract
+        # 下载中文语言包
+        TESSDATA=$(brew --prefix tesseract)/share/tessdata
+        [ ! -f "$TESSDATA/chi_sim.traineddata" ] && \
+            curl -sL -o "$TESSDATA/chi_sim.traineddata" \
+            https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata
+    else
+        echo "⚠️  无法自动安装 tesseract，请手动安装后重试"
+    fi
+else
+    echo "✅ tesseract 已安装: $(tesseract --version 2>&1 | head -1)"
+fi
+
 # 检查 Python 3.12
 if command -v python3.12 &> /dev/null; then
     PYTHON=python3.12
