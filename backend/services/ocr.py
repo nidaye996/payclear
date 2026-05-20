@@ -1,0 +1,147 @@
+"""
+用工协议 PDF OCR 解析服务
+- 第1页：识别姓名 + 身份证号
+- 第2-5页：识别日工资金额 + 验证劳动报酬条款模板
+"""
+import re
+import logging
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
+
+# 劳动报酬条款必须包含的关键字（用于模板验证）
+TEMPLATE_KEYWORDS = [
+    "劳动报酬",
+    "元/日",
+    "按考勤天数计算月度工资",
+    "次月20日前支付",
+]
+
+
+def _ocr_page(page, resolution: int = 300) -> str:
+    """对 pdfplumber 的一页做 OCR，返回识别文字"""
+    try:
+        import pytesseract
+        from PIL import Image
+        import io
+
+        img_obj = page.to_image(resolution=resolution)
+        # pdfplumber 的 PageImage 有 original 属性是 PIL Image
+        pil_img = img_obj.original
+        text = pytesseract.image_to_string(pil_img, lang='chi_sim')
+        return text
+    except Exception as e:
+        logger.warning(f"OCR页面失败: {e}")
+        return ""
+
+
+def _extract_name(text: str) -> str:
+    """从第1页文字中提取姓名"""
+    patterns = [
+        r'乙\s*方\s*[（(]\s*劳\s*动\s*者\s*[）)]\s*姓\s*名\s*[:：,，]\s*_*\s*([^\s_\n，。]{2,5})',
+        r'姓\s*名\s*[:：,，]\s*_*\s*([^\s_\n，。]{2,5})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            name = m.group(1).strip().strip('_').strip()
+            if 2 <= len(name) <= 5:
+                return name
+    return ''
+
+
+def _extract_id_card(text: str) -> str:
+    """从第1页文字中提取身份证号（18位）"""
+    # 先找标准格式
+    patterns = [
+        r'居\s*民\s*身\s*份\s*证\s*号\s*码\s*[:：]\s*([0-9Xx\s]{15,25})',
+        r'身\s*份\s*证\s*号\s*[:：]\s*([0-9Xx\s]{15,25})',
+        r'证\s*号\s*[:：]\s*([0-9Xx\s]{15,25})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            raw = re.sub(r'\s', '', m.group(1)).upper()
+            if len(raw) == 18:
+                return raw
+    # 兜底：直接找18位数字串
+    m = re.search(r'\b([0-9]{17}[0-9X])\b', text.replace(' ', ''))
+    if m:
+        return m.group(1).upper()
+    return ''
+
+
+def _extract_daily_wage(text: str) -> float | None:
+    """从合同正文中提取日工资金额"""
+    patterns = [
+        r'劳\s*动\s*报\s*酬\s*为\s*(\d+(?:\.\d+)?)\s*元\s*/\s*日',
+        r'(\d+(?:\.\d+)?)\s*元\s*/\s*日',
+        r'劳\s*动\s*报\s*酬\s*为\s*(\d+(?:\.\d+)?)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            try:
+                val = float(m.group(1))
+                if 50 <= val <= 2000:  # 合理日工资范围
+                    return val
+            except ValueError:
+                continue
+    return None
+
+
+def _check_template(text: str) -> bool:
+    """验证劳动报酬条款模板是否合规"""
+    hit = sum(1 for kw in TEMPLATE_KEYWORDS if kw in text.replace(' ', ''))
+    return hit >= 3  # 4个关键词中至少中3个
+
+
+def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
+    """
+    解析用工协议 PDF。
+    返回：{
+        'name': str,
+        'id_card': str,
+        'daily_wage': float | None,
+        'template_valid': bool,
+        'error': str | None,
+    }
+    """
+    result = {
+        'name': '',
+        'id_card': '',
+        'daily_wage': None,
+        'template_valid': False,
+        'error': None,
+    }
+
+    try:
+        import pdfplumber
+    except ImportError:
+        result['error'] = 'pdfplumber 未安装'
+        return result
+
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            if not pdf.pages:
+                result['error'] = 'PDF无页面'
+                return result
+
+            # 第1页：识别姓名和身份证号
+            page1_text = _ocr_page(pdf.pages[0])
+            result['name'] = _extract_name(page1_text)
+            result['id_card'] = _extract_id_card(page1_text)
+
+            # 第2-5页：找日工资 + 验模板
+            body_text = ''
+            for page in pdf.pages[1:5]:
+                body_text += _ocr_page(page) + '\n'
+
+            result['daily_wage'] = _extract_daily_wage(body_text)
+            result['template_valid'] = _check_template(body_text)
+
+    except Exception as e:
+        logger.error(f"解析合同PDF失败 {file_path}: {e}", exc_info=True)
+        result['error'] = str(e)
+
+    return result

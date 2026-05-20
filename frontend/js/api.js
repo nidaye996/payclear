@@ -252,6 +252,43 @@ async function exportReport(reportId) {
     URL.revokeObjectURL(url);
 }
 
+// ==================== 用工协议 API ====================
+
+async function getContracts(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return await api.get(`/contracts${qs ? '?' + qs : ''}`);
+}
+
+async function getContractStats() {
+    return await api.get('/contracts/stats');
+}
+
+async function uploadContracts(files) {
+    const token = getToken();
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files', file);
+    }
+    const response = await fetch(`${API_BASE}/contracts/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+    }
+    return await response.json();
+}
+
+async function deleteContract(contractId) {
+    return await api.delete(`/contracts/${contractId}`);
+}
+
+async function getContractByIdCard(idCard) {
+    return await api.get(`/contracts/by-worker/${idCard}`);
+}
+
 // ==================== 银行联号库 API ====================
 
 async function getBankRoutingStats() {

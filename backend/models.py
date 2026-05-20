@@ -169,6 +169,31 @@ class Announcement(Base):
     author = relationship("User")
 
 
+class WorkerContract(Base):
+    """工人用工协议"""
+    __tablename__ = "worker_contracts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    worker_id = Column(Integer, ForeignKey("workers.id"), nullable=True, comment="匹配到的工人ID，未匹配则NULL")
+    id_card = Column(String(18), comment="OCR识别到的身份证号")
+    name = Column(String(50), comment="OCR识别到的姓名")
+    daily_wage = Column(Float, nullable=True, comment="日工资（元/日）")
+    file_path = Column(String(500), comment="PDF存储路径")
+    original_filename = Column(String(255), comment="原始文件名")
+    template_valid = Column(Boolean, default=False, comment="劳动报酬条款是否合规")
+    ocr_status = Column(String(20), default='pending', comment="pending/done/failed")
+    ocr_error = Column(Text, nullable=True, comment="OCR错误信息")
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    worker = relationship("Worker", foreign_keys=[worker_id])
+
+    __table_args__ = (
+        Index("ix_worker_contracts_id_card", "id_card"),
+        Index("ix_worker_contracts_worker_id", "worker_id"),
+    )
+
+
 class MonthlySubmission(Base):
     """月度提交记录"""
     __tablename__ = "monthly_submissions"

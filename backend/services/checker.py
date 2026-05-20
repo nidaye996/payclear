@@ -116,7 +116,10 @@ def run_check(
     if station_meeting and attendance_by_name:
         issues.extend(check_station_meeting(attendance_by_name, station_meeting))
 
-    # 第七层：历史数据核对
+    # 第七层：用工协议核查（合同存在性 + 日工资校验）
+    issues.extend(check_contracts(all_id_cards, salary_index, attendance_by_name, db))
+
+    # 第八层：历史数据核对
     issues.extend(check_history(
         all_id_cards, registry_index, salary_index,
         submission.team_id, submission.year, submission.month, db,
@@ -749,7 +752,112 @@ def check_station_meeting(
     return issues
 
 
-# ==================== 第七层：历史数据核对 ====================
+# ==================== 第七层：用工协议核查 ====================
+
+def check_contracts(
+    all_id_cards: set,
+    salary: Dict[str, Dict],
+    attendance_by_name: Dict[str, Dict],
+    db: Session,
+) -> List[Dict[str, Any]]:
+    """
+    用工协议核查：
+    1. 无用工协议 → 警告
+    2. 日工资 × 考勤天数 ≠ 应发工资 → 错误
+    3. 有代扣项（代扣>0）→ 提示
+    """
+    from models import WorkerContract
+
+    issues = []
+
+    for id_card in all_id_cards:
+        s = salary.get(id_card, {})
+        name = s.get('name', '') or id_card
+
+        contracts = db.query(WorkerContract).filter(
+            WorkerContract.id_card == id_card
+        ).all()
+
+        if not contracts:
+            issues.append({
+                'severity': 'warning',
+                'issue_type': 'contract',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '用工协议',
+                'description': '该工人无用工协议记录，请及时补签并上传',
+                'source_a': None,
+                'source_b': None,
+            })
+            continue
+
+        # 取日工资（优先取有效协议的第一份）
+        contract = contracts[0]
+        daily_wage = contract.daily_wage
+
+        if daily_wage is None:
+            continue
+
+        # 获取考勤天数（优先工资表，其次考勤表）
+        days = s.get('days_attended')
+        if days is None:
+            att = attendance_by_name.get(name, {})
+            days = att.get('days_attended')
+
+        try:
+            days = float(days) if days is not None else None
+        except (TypeError, ValueError):
+            days = None
+
+        if days is None:
+            continue
+
+        # 检查代扣
+        deduction = s.get('deduction')
+        try:
+            deduction = float(deduction) if deduction is not None else 0.0
+        except (TypeError, ValueError):
+            deduction = 0.0
+
+        if deduction > 0:
+            issues.append({
+                'severity': 'info',
+                'issue_type': 'contract',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '代扣项',
+                'description': f'该工人有代扣项 {deduction} 元，应发工资已扣除，请人工核实是否合理',
+                'source_a': f'代扣: {deduction}元',
+                'source_b': None,
+            })
+
+        # 日工资 × 考勤天数 = 应发工资
+        expected = round(daily_wage * days, 2)
+        gross = s.get('gross_salary')
+        try:
+            gross = float(gross) if gross is not None else None
+        except (TypeError, ValueError):
+            gross = None
+
+        if gross is not None and abs(expected - gross) > 0.5:
+            issues.append({
+                'severity': 'error',
+                'issue_type': 'contract',
+                'worker_name': name,
+                'id_card': id_card,
+                'field': '应发工资',
+                'description': (
+                    f'按协议日工资{daily_wage}元×出勤{int(days)}天='
+                    f'{expected}元，与工资表应发{gross}元不符'
+                ),
+                'source_a': f'协议计算: {expected}元',
+                'source_b': f'工资表: {gross}元',
+            })
+
+    return issues
+
+
+# ==================== 第八层：历史数据核对 ====================
 
 def check_history(
     all_id_cards: set,

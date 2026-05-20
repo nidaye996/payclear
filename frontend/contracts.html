@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用工协议 - 薪核通 PayClear</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f7fa; color: #333; }
+        .navbar { background: linear-gradient(135deg, #1a3a5c, #2d6a9f); color: white; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+        .layout { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
+        .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
+        .nav-item .icon { margin-right: 8px; }
+        .nav-section { padding: 16px 24px 6px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        .main-content { flex: 1; padding: 28px; overflow: auto; }
+        .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+
+        /* 统计卡片 */
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 10px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .stat-card .num { font-size: 28px; font-weight: 700; }
+        .stat-card .lbl { font-size: 12px; color: #888; margin-top: 4px; }
+        .num-blue { color: #2d6a9f; }
+        .num-green { color: #28a745; }
+        .num-red { color: #dc3545; }
+        .num-orange { color: #e67e22; }
+
+        /* 上传区域 */
+        .upload-zone { border: 2px dashed #ccc; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: #2d6a9f; background: #f0f5ff; }
+        .upload-zone .icon { font-size: 48px; display: block; margin-bottom: 12px; }
+        .upload-zone .hint { font-size: 14px; color: #666; }
+        .upload-zone .sub { font-size: 12px; color: #aaa; margin-top: 6px; }
+
+        /* 进度条 */
+        .progress-bar { background: #e9ecef; border-radius: 4px; height: 6px; margin-top: 8px; }
+        .progress-fill { background: #2d6a9f; border-radius: 4px; height: 6px; transition: width 0.3s; }
+
+        /* 筛选 */
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .filter-bar select, .filter-bar input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; }
+        .filter-bar select:focus, .filter-bar input:focus { border-color: #2d6a9f; }
+
+        /* 表格 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        tr:hover td { background: #fafafa; }
+
+        /* 状态标签 */
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .tag-green { background: #d4edda; color: #155724; }
+        .tag-red { background: #fce8e8; color: #c0392b; }
+        .tag-orange { background: #fff3cd; color: #856404; }
+        .tag-gray { background: #e9ecef; color: #666; }
+        .tag-blue { background: #d1ecf1; color: #0c5460; }
+
+        .btn { padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #2d6a9f; color: white; }
+        .btn-primary:hover { background: #1a5485; }
+        .btn-danger-sm { background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .btn-danger-sm:hover { background: #dc3545; color: white; }
+
+        #upload-input { display: none; }
+
+        /* 上传结果 */
+        .upload-result { margin-top: 16px; }
+        .result-item { padding: 10px 14px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+        .result-item.ok { background: #d4edda; color: #155724; }
+        .result-item.warn { background: #fff3cd; color: #856404; }
+        .result-item.err { background: #fce8e8; color: #c0392b; }
+
+        .empty { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">🏗️ 薪核通 PayClear</div>
+    <div class="navbar-right">
+        <span class="user-badge" id="user-display">加载中...</span>
+        <a href="/dashboard.html" class="btn-back">← 返回工作台</a>
+    </div>
+</nav>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="nav-section">核对管理</div>
+        <a href="/dashboard.html" class="nav-item"><span class="icon">🏠</span>工作台</a>
+        <a href="/upload.html" class="nav-item"><span class="icon">📤</span>上传表格</a>
+        <a href="/report.html" class="nav-item"><span class="icon">📊</span>核对报告</a>
+        <div class="nav-section">数据管理</div>
+        <a href="/workers.html" class="nav-item"><span class="icon">👷</span>工人信息</a>
+        <a href="/contracts.html" class="nav-item active"><span class="icon">📝</span>用工协议</a>
+        <a href="/import.html" class="nav-item admin-only"><span class="icon">📥</span>历史数据导入</a>
+        <div class="nav-section">系统管理</div>
+        <a href="/admin.html" class="nav-item admin-only"><span class="icon">⚙️</span>系统设置</a>
+        <a href="/accounts.html" class="nav-item"><span class="icon">👤</span>账号管理</a>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-title">用工协议管理</div>
+
+        <!-- 统计 -->
+        <div class="stats-row" id="stats-row">
+            <div class="stat-card"><div class="num num-blue" id="s-total">-</div><div class="lbl">协议总数</div></div>
+            <div class="stat-card"><div class="num num-green" id="s-matched">-</div><div class="lbl">已匹配工人</div></div>
+            <div class="stat-card"><div class="num num-red" id="s-no-contract">-</div><div class="lbl">工人缺少协议</div></div>
+            <div class="stat-card"><div class="num num-orange" id="s-invalid">-</div><div class="lbl">模板不合规</div></div>
+        </div>
+
+        <!-- 上传区域（仅管理员） -->
+        <div class="card admin-only" id="upload-card">
+            <h2 style="font-size:15px;margin-bottom:16px">批量上传用工协议</h2>
+            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('upload-input').click()">
+                <span class="icon">📄</span>
+                <div class="hint">点击选择 PDF 文件，或将文件拖拽至此处</div>
+                <div class="sub">支持同时选择多个文件，系统自动 OCR 识别姓名、身份证、日工资</div>
+            </div>
+            <input type="file" id="upload-input" multiple accept=".pdf" onchange="handleUpload(this.files)">
+            <div id="upload-progress" style="display:none;margin-top:12px">
+                <div style="font-size:13px;color:#666" id="progress-text">处理中...</div>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+            </div>
+            <div class="upload-result" id="upload-result"></div>
+        </div>
+
+        <!-- 协议列表 -->
+        <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <h2 style="font-size:15px">协议列表</h2>
+                <span id="list-count" style="font-size:13px;color:#888"></span>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="search-input" placeholder="搜索姓名或身份证" oninput="loadContracts()">
+                <select id="status-filter" onchange="loadContracts()">
+                    <option value="">全部状态</option>
+                    <option value="matched">已匹配工人</option>
+                    <option value="unmatched">未匹配工人</option>
+                    <option value="invalid">模板不合规</option>
+                </select>
+            </div>
+            <div id="contracts-table">
+                <div class="empty">加载中...</div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+    checkLoginStatus();
+    renderUserInfo();
+    initAnnouncements();
+
+    // 拖拽上传
+    const zone = document.getElementById('upload-zone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        handleUpload(e.dataTransfer.files);
+    });
+
+    async function loadStats() {
+        try {
+            const s = await getContractStats();
+            document.getElementById('s-total').textContent = s.total;
+            document.getElementById('s-matched').textContent = s.matched;
+            document.getElementById('s-no-contract').textContent = s.workers_without_contract;
+            document.getElementById('s-invalid').textContent = s.invalid_template;
+        } catch(e) {}
+    }
+
+    async function loadContracts() {
+        const search = document.getElementById('search-input').value.trim();
+        const status = document.getElementById('status-filter').value;
+        const params = {};
+        if (search) params.search = search;
+        if (status) params.status = status;
+
+        try {
+            const list = await getContracts(params);
+            document.getElementById('list-count').textContent = `共 ${list.length} 份`;
+
+            if (list.length === 0) {
+                document.getElementById('contracts-table').innerHTML = '<div class="empty">暂无用工协议</div>';
+                return;
+            }
+
+            const rows = list.map(c => {
+                const templateTag = c.template_valid
+                    ? '<span class="tag tag-green">✓ 合规</span>'
+                    : '<span class="tag tag-red">✗ 不合规</span>';
+                const matchTag = c.worker_matched
+                    ? `<span class="tag tag-green">✓ ${c.worker_name_in_db || c.name}</span>`
+                    : '<span class="tag tag-orange">未匹配</span>';
+                const dupTag = c.has_duplicate
+                    ? '<span class="tag tag-red" title="同一工人存在多份协议">重复</span> '
+                    : '';
+                const ocrTag = c.ocr_status === 'failed'
+                    ? `<span class="tag tag-red" title="${c.ocr_error || ''}">OCR失败</span>`
+                    : '';
+                const wageText = c.daily_wage != null ? `${c.daily_wage} 元/日` : '<span style="color:#aaa">未识别</span>';
+                const deleteBtn = isAdminOrOperator()
+                    ? `<button class="btn-danger-sm" onclick="doDeleteContract(${c.id}, '${c.name}')">删除</button>`
+                    : '';
+
+                return `<tr>
+                    <td>${dupTag}${c.name || '<span style="color:#aaa">未识别</span>'}</td>
+                    <td style="font-family:monospace;font-size:12px">${c.id_card || '-'}</td>
+                    <td>${wageText}</td>
+                    <td>${templateTag} ${ocrTag}</td>
+                    <td>${matchTag}</td>
+                    <td style="font-size:12px;color:#888">${c.original_filename}</td>
+                    <td style="font-size:12px;color:#888">${formatDate(c.uploaded_at)}</td>
+                    <td>${deleteBtn}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('contracts-table').innerHTML = `
+                <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>姓名</th><th>身份证</th><th>日工资</th>
+                        <th>模板</th><th>匹配状态</th><th>文件名</th><th>上传时间</th><th>操作</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                </div>`;
+        } catch(e) {
+            document.getElementById('contracts-table').innerHTML = `<div class="empty" style="color:#dc3545">加载失败: ${e.message}</div>`;
+        }
+    }
+
+    async function handleUpload(files) {
+        if (!files || files.length === 0) return;
+        const fileArr = Array.from(files);
+
+        document.getElementById('upload-progress').style.display = 'block';
+        document.getElementById('upload-result').innerHTML = '';
+        document.getElementById('progress-fill').style.width = '0%';
+        document.getElementById('progress-text').textContent = `正在处理 ${fileArr.length} 份协议，OCR识别中，请耐心等待...`;
+
+        // 分批上传，每批5个
+        const batchSize = 5;
+        const results = [];
+        for (let i = 0; i < fileArr.length; i += batchSize) {
+            const batch = fileArr.slice(i, i + batchSize);
+            try {
+                const res = await uploadContracts(batch);
+                results.push(...(res.results || []));
+            } catch(e) {
+                batch.forEach(f => results.push({ filename: f.name, error: e.message }));
+            }
+            const pct = Math.round(Math.min(i + batchSize, fileArr.length) / fileArr.length * 100);
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = `已处理 ${Math.min(i + batchSize, fileArr.length)} / ${fileArr.length} 份...`;
+        }
+
+        document.getElementById('upload-progress').style.display = 'none';
+
+        // 显示结果
+        const html = results.map(r => {
+            if (r.error && !r.id) {
+                return `<div class="result-item err">❌ ${r.filename || r.original_filename}: ${r.error}</div>`;
+            }
+            const wage = r.daily_wage != null ? `，日工资 ${r.daily_wage} 元` : '';
+            const template = r.template_valid ? '' : '，⚠️ 模板不合规';
+            const match = r.worker_matched ? `，✓ 匹配到 ${r.worker_name_in_db}` : '，⚠️ 未在工人库中找到';
+            const dup = r.has_duplicate ? '，⚠️ 该工人已有协议' : '';
+            const cls = (!r.template_valid || !r.worker_matched || r.has_duplicate) ? 'warn' : 'ok';
+            return `<div class="result-item ${cls}">✓ ${r.name || r.original_filename}${wage}${template}${match}${dup}</div>`;
+        }).join('');
+        document.getElementById('upload-result').innerHTML = html;
+
+        // 刷新列表和统计
+        await loadStats();
+        await loadContracts();
+        document.getElementById('upload-input').value = '';
+    }
+
+    async function doDeleteContract(id, name) {
+        if (!confirm(`确认删除【${name}】的用工协议？此操作不可恢复。`)) return;
+        try {
+            await deleteContract(id);
+            showToast('协议已删除', 'success');
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('删除失败: ' + e.message, 'error');
+        }
+    }
+
+    loadStats();
+    loadContracts();
+</script>
+</body>
+</html>
