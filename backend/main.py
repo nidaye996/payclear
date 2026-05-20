@@ -91,6 +91,18 @@ def _migrate_db():
         except Exception:
             pass
 
+        # 添加 worker_contracts.missing_keywords 列
+        try:
+            conn.execute(
+                __import__('sqlalchemy').text(
+                    "ALTER TABLE worker_contracts ADD COLUMN missing_keywords TEXT"
+                )
+            )
+            conn.commit()
+            logger.info("worker_contracts.missing_keywords 列添加成功")
+        except Exception:
+            pass
+
 
 def _init_admin():
     """初始化默认管理员账号"""

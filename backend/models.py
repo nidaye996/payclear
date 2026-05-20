@@ -183,6 +183,7 @@ class WorkerContract(Base):
     template_valid = Column(Boolean, default=False, comment="劳动报酬条款是否合规")
     ocr_status = Column(String(20), default='pending', comment="pending/done/failed")
     ocr_error = Column(Text, nullable=True, comment="OCR错误信息")
+    missing_keywords = Column(String(500), nullable=True, comment="模板缺失的关键词（逗号分隔）")
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 

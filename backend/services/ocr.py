@@ -90,10 +90,11 @@ def _extract_daily_wage(text: str) -> float | None:
     return None
 
 
-def _check_template(text: str) -> bool:
-    """验证劳动报酬条款模板是否合规"""
-    hit = sum(1 for kw in TEMPLATE_KEYWORDS if kw in text.replace(' ', ''))
-    return hit >= 3  # 4个关键词中至少中3个
+def _check_template(text: str) -> tuple:
+    """验证劳动报酬条款模板是否合规，返回 (合规bool, 缺失关键词列表)"""
+    clean = text.replace(' ', '')
+    missing = [kw for kw in TEMPLATE_KEYWORDS if kw not in clean]
+    return len(missing) <= 1, missing
 
 
 def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
@@ -112,6 +113,7 @@ def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
         'id_card': '',
         'daily_wage': None,
         'template_valid': False,
+        'missing_keywords': [],
         'error': None,
     }
 
@@ -138,7 +140,9 @@ def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
                 body_text += _ocr_page(page) + '\n'
 
             result['daily_wage'] = _extract_daily_wage(body_text)
-            result['template_valid'] = _check_template(body_text)
+            template_valid, missing_kws = _check_template(body_text)
+            result['template_valid'] = template_valid
+            result['missing_keywords'] = missing_kws
 
     except Exception as e:
         logger.error(f"解析合同PDF失败 {file_path}: {e}", exc_info=True)

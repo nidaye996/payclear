@@ -13,7 +13,7 @@
         .user-badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
         .btn-back { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
         .layout { display: flex; min-height: calc(100vh - 60px); }
-        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; }
+        .sidebar { width: 220px; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.06); padding: 20px 0; flex-shrink: 0; position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; }
         .nav-item { display: block; padding: 12px 24px; color: #555; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
         .nav-item:hover { background: #f0f5ff; color: #2d6a9f; }
         .nav-item.active { background: #e8f0fe; color: #2d6a9f; border-left-color: #2d6a9f; font-weight: 600; }
@@ -23,7 +23,6 @@
         .page-title { font-size: 22px; font-weight: 700; color: #1a3a5c; margin-bottom: 24px; }
         .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
 
-        /* 统计卡片 */
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
         .stat-card { background: white; border-radius: 10px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .stat-card .num { font-size: 28px; font-weight: 700; }
@@ -33,52 +32,89 @@
         .num-red { color: #dc3545; }
         .num-orange { color: #e67e22; }
 
-        /* 上传区域 */
         .upload-zone { border: 2px dashed #ccc; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; }
         .upload-zone:hover, .upload-zone.dragover { border-color: #2d6a9f; background: #f0f5ff; }
         .upload-zone .icon { font-size: 48px; display: block; margin-bottom: 12px; }
         .upload-zone .hint { font-size: 14px; color: #666; }
         .upload-zone .sub { font-size: 12px; color: #aaa; margin-top: 6px; }
 
-        /* 进度条 */
         .progress-bar { background: #e9ecef; border-radius: 4px; height: 6px; margin-top: 8px; }
         .progress-fill { background: #2d6a9f; border-radius: 4px; height: 6px; transition: width 0.3s; }
 
-        /* 筛选 */
-        .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
         .filter-bar select, .filter-bar input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; }
         .filter-bar select:focus, .filter-bar input:focus { border-color: #2d6a9f; }
 
-        /* 表格 */
+        .bulk-bar { display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; align-items: center; gap: 12px; font-size: 13px; }
+        .bulk-bar.show { display: flex; }
+
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { background: #f8f9fa; padding: 10px 12px; text-align: left; color: #666; font-weight: 600; border-bottom: 2px solid #eee; white-space: nowrap; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { background: #eef0f3; color: #333; }
+        th .sort-icon { margin-left: 4px; color: #aaa; font-size: 11px; }
+        th.sort-asc .sort-icon::after { content: '▲'; color: #2d6a9f; }
+        th.sort-desc .sort-icon::after { content: '▼'; color: #2d6a9f; }
+        th.sortable:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '⇅'; }
         td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
         tr:hover td { background: #fafafa; }
 
-        /* 状态标签 */
         .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
         .tag-green { background: #d4edda; color: #155724; }
         .tag-red { background: #fce8e8; color: #c0392b; }
         .tag-orange { background: #fff3cd; color: #856404; }
         .tag-gray { background: #e9ecef; color: #666; }
         .tag-blue { background: #d1ecf1; color: #0c5460; }
+        .tag-red[title] { cursor: help; }
 
         .btn { padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
         .btn-primary { background: #2d6a9f; color: white; }
         .btn-primary:hover { background: #1a5485; }
-        .btn-danger-sm { background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .btn-sm { padding: 4px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; border: 1px solid; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
+        .btn-danger-sm { background: transparent; border-color: #dc3545; color: #dc3545; }
         .btn-danger-sm:hover { background: #dc3545; color: white; }
+        .btn-edit-sm { background: transparent; border-color: #2d6a9f; color: #2d6a9f; }
+        .btn-edit-sm:hover { background: #2d6a9f; color: white; }
+        .btn-reocr-sm { background: transparent; border-color: #17a2b8; color: #17a2b8; }
+        .btn-reocr-sm:hover { background: #17a2b8; color: white; }
+        .btn-replace-sm { background: transparent; border-color: #6c757d; color: #6c757d; }
+        .btn-replace-sm:hover { background: #6c757d; color: white; }
+        .btn-warning { background: #ffc107; color: #333; border: none; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; color: white; border: none; }
+        .btn-danger:hover { background: #b02a37; }
+        .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; }
 
-        #upload-input { display: none; }
+        #upload-input, #replace-input, #check-input { display: none; }
 
-        /* 上传结果 */
-        .upload-result { margin-top: 16px; }
+        .upload-result { margin-top: 16px; max-height: 300px; overflow-y: auto; }
         .result-item { padding: 10px 14px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
         .result-item.ok { background: #d4edda; color: #155724; }
         .result-item.warn { background: #fff3cd; color: #856404; }
         .result-item.err { background: #fce8e8; color: #c0392b; }
 
+        .fail-summary { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin-top: 12px; }
+        .fail-summary h4 { font-size: 14px; margin-bottom: 8px; color: #856404; }
+        .fail-list { font-size: 12px; color: #666; max-height: 120px; overflow-y: auto; margin-bottom: 10px; }
+        .fail-list div { padding: 2px 0; }
+
         .empty { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+
+        /* 弹窗 */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: white; border-radius: 12px; padding: 28px; width: 420px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .modal-box h3 { font-size: 16px; margin-bottom: 6px; color: #1a3a5c; }
+        .modal-box .modal-sub { font-size: 12px; color: #888; margin-bottom: 18px; }
+        .modal-box label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; margin-top: 12px; }
+        .modal-box input { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; }
+        .modal-box input:focus { border-color: #2d6a9f; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        /* 查缺结果 */
+        .missing-result { background: #fce8e8; border: 1px solid #dc3545; border-radius: 8px; padding: 16px; margin-top: 12px; }
+        .missing-result h4 { font-size: 14px; color: #c0392b; margin-bottom: 8px; }
+        .missing-list { font-size: 12px; color: #555; max-height: 200px; overflow-y: auto; }
+        .missing-list div { padding: 3px 0; border-bottom: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
@@ -110,14 +146,14 @@
         <div class="page-title">用工协议管理</div>
 
         <!-- 统计 -->
-        <div class="stats-row" id="stats-row">
+        <div class="stats-row">
             <div class="stat-card"><div class="num num-blue" id="s-total">-</div><div class="lbl">协议总数</div></div>
             <div class="stat-card"><div class="num num-green" id="s-matched">-</div><div class="lbl">已匹配工人</div></div>
             <div class="stat-card"><div class="num num-red" id="s-no-contract">-</div><div class="lbl">工人缺少协议</div></div>
             <div class="stat-card"><div class="num num-orange" id="s-invalid">-</div><div class="lbl">模板不合规</div></div>
         </div>
 
-        <!-- 上传区域（仅管理员） -->
+        <!-- 上传区域 -->
         <div class="card admin-only" id="upload-card">
             <h2 style="font-size:15px;margin-bottom:16px">批量上传用工协议</h2>
             <div class="upload-zone" id="upload-zone" onclick="document.getElementById('upload-input').click()">
@@ -130,7 +166,12 @@
                 <div style="font-size:13px;color:#666" id="progress-text">处理中...</div>
                 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
             </div>
-            <div class="upload-result" id="upload-result"></div>
+            <div id="upload-result"></div>
+            <div id="fail-summary" style="display:none" class="fail-summary">
+                <h4 id="fail-summary-title"></h4>
+                <div class="fail-list" id="fail-list"></div>
+                <button class="btn btn-warning" onclick="reOcrAllFailed()">重新识别全部未识别合同</button>
+            </div>
         </div>
 
         <!-- 协议列表 -->
@@ -139,6 +180,7 @@
                 <h2 style="font-size:15px">协议列表</h2>
                 <span id="list-count" style="font-size:13px;color:#888"></span>
             </div>
+
             <div class="filter-bar">
                 <input type="text" id="search-input" placeholder="搜索姓名或身份证" oninput="loadContracts()">
                 <select id="status-filter" onchange="loadContracts()">
@@ -146,20 +188,64 @@
                     <option value="matched">已匹配工人</option>
                     <option value="unmatched">未匹配工人</option>
                     <option value="invalid">模板不合规</option>
+                    <option value="unrecognized">姓名/身份证未识别</option>
+                    <option value="duplicate">存在重复</option>
                 </select>
+                <button class="btn btn-primary" style="font-size:13px;padding:8px 14px" onclick="doCheckMissing()">查缺</button>
+                <input type="file" id="check-input" multiple accept=".pdf" onchange="handleCheckMissing(this.files)">
             </div>
-            <div id="contracts-table">
-                <div class="empty">加载中...</div>
+
+            <!-- 批量操作栏 -->
+            <div class="bulk-bar" id="bulk-bar">
+                <span id="bulk-count">已选 0 条</span>
+                <button class="btn btn-danger" style="padding:5px 14px;font-size:13px" onclick="doBulkDelete()">批量删除</button>
+                <button class="btn" style="padding:5px 14px;font-size:13px;background:#e9ecef;color:#555" onclick="clearSelection()">取消选择</button>
             </div>
+
+            <!-- 查缺结果 -->
+            <div id="missing-result" style="display:none" class="missing-result">
+                <h4 id="missing-title"></h4>
+                <div class="missing-list" id="missing-list"></div>
+            </div>
+
+            <div id="contracts-table"><div class="empty">加载中...</div></div>
         </div>
     </main>
 </div>
 
-<script src="/static/js/api.js?v=3"></script>
+<!-- 编辑弹窗 -->
+<div id="edit-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEditModal()">
+    <div class="modal-box">
+        <h3>手动编辑协议信息</h3>
+        <div class="modal-sub" id="edit-modal-sub"></div>
+        <label>姓名</label>
+        <input id="edit-name" type="text" placeholder="输入正确姓名">
+        <label>身份证号（18位）</label>
+        <input id="edit-idcard" type="text" placeholder="18位身份证号" maxlength="18">
+        <div class="modal-actions">
+            <button class="btn" style="background:#e9ecef;color:#555" onclick="closeEditModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitEdit()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 替换PDF的隐藏input -->
+<input type="file" id="replace-input" accept=".pdf" onchange="submitReplace(this.files[0])">
+
+<script src="/static/js/api.js?v=4"></script>
 <script>
     checkLoginStatus();
     renderUserInfo();
     initAnnouncements();
+
+    // 状态
+    let allContracts = [];
+    let sortKey = 'uploaded_at';
+    let sortAsc = false;
+    let selectedIds = new Set();
+    let editingId = null;
+    let replacingId = null;
+    let failedContractIds = []; // 上传后未识别的合同ID
 
     // 拖拽上传
     const zone = document.getElementById('upload-zone');
@@ -187,71 +273,253 @@
         const params = {};
         if (search) params.search = search;
         if (status) params.status = status;
-
         try {
-            const list = await getContracts(params);
-            document.getElementById('list-count').textContent = `共 ${list.length} 份`;
-
-            if (list.length === 0) {
-                document.getElementById('contracts-table').innerHTML = '<div class="empty">暂无用工协议</div>';
-                return;
-            }
-
-            const rows = list.map(c => {
-                const templateTag = c.template_valid
-                    ? '<span class="tag tag-green">✓ 合规</span>'
-                    : '<span class="tag tag-red">✗ 不合规</span>';
-                const matchTag = c.worker_matched
-                    ? `<span class="tag tag-green">✓ ${c.worker_name_in_db || c.name}</span>`
-                    : '<span class="tag tag-orange">未匹配</span>';
-                const dupTag = c.has_duplicate
-                    ? '<span class="tag tag-red" title="同一工人存在多份协议">重复</span> '
-                    : '';
-                const ocrTag = c.ocr_status === 'failed'
-                    ? `<span class="tag tag-red" title="${c.ocr_error || ''}">OCR失败</span>`
-                    : '';
-                const wageText = c.daily_wage != null ? `${c.daily_wage} 元/日` : '<span style="color:#aaa">未识别</span>';
-                const deleteBtn = isAdminOrOperator()
-                    ? `<button class="btn-danger-sm" onclick="doDeleteContract(${c.id}, '${c.name}')">删除</button>`
-                    : '';
-
-                return `<tr>
-                    <td>${dupTag}${c.name || '<span style="color:#aaa">未识别</span>'}</td>
-                    <td style="font-family:monospace;font-size:12px">${c.id_card || '-'}</td>
-                    <td>${wageText}</td>
-                    <td>${templateTag} ${ocrTag}</td>
-                    <td>${matchTag}</td>
-                    <td style="font-size:12px;color:#888">${c.original_filename}</td>
-                    <td style="font-size:12px;color:#888">${formatDate(c.uploaded_at)}</td>
-                    <td>${deleteBtn}</td>
-                </tr>`;
-            }).join('');
-
-            document.getElementById('contracts-table').innerHTML = `
-                <div style="overflow-x:auto">
-                <table>
-                    <thead><tr>
-                        <th>姓名</th><th>身份证</th><th>日工资</th>
-                        <th>模板</th><th>匹配状态</th><th>文件名</th><th>上传时间</th><th>操作</th>
-                    </tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>
-                </div>`;
+            allContracts = await getContracts(params);
+            document.getElementById('list-count').textContent = `共 ${allContracts.length} 份`;
+            renderContracts();
         } catch(e) {
-            document.getElementById('contracts-table').innerHTML = `<div class="empty" style="color:#dc3545">加载失败: ${e.message}</div>`;
+            document.getElementById('contracts-table').innerHTML =
+                `<div class="empty" style="color:#dc3545">加载失败: ${e.message}</div>`;
         }
     }
 
+    function renderContracts() {
+        if (allContracts.length === 0) {
+            document.getElementById('contracts-table').innerHTML = '<div class="empty">暂无用工协议</div>';
+            return;
+        }
+
+        // 排序
+        const sorted = [...allContracts].sort((a, b) => {
+            let va = a[sortKey], vb = b[sortKey];
+            if (va == null) va = sortAsc ? '￿' : '';
+            if (vb == null) vb = sortAsc ? '￿' : '';
+            if (typeof va === 'number') return sortAsc ? va - vb : vb - va;
+            return sortAsc ? String(va).localeCompare(String(vb), 'zh') : String(vb).localeCompare(String(va), 'zh');
+        });
+
+        const isAdmin = isAdminOrOperator();
+        const allChecked = sorted.length > 0 && sorted.every(c => selectedIds.has(c.id));
+
+        const rows = sorted.map(c => {
+            const checked = selectedIds.has(c.id) ? 'checked' : '';
+            const templateTitle = !c.template_valid && c.missing_keywords && c.missing_keywords.length
+                ? `缺少关键词：${c.missing_keywords.join('、')}`
+                : '';
+            const templateTag = c.template_valid
+                ? '<span class="tag tag-green">✓ 合规</span>'
+                : `<span class="tag tag-red" title="${templateTitle}" style="${templateTitle ? 'cursor:help' : ''}">✗ 不合规</span>`;
+            const matchTag = c.worker_matched
+                ? `<span class="tag tag-green">✓ ${c.worker_name_in_db || c.name}</span>`
+                : '<span class="tag tag-orange">未匹配</span>';
+            const dupTag = c.has_duplicate
+                ? '<span class="tag tag-red" title="同一身份证存在多份协议，请核查">重复</span> '
+                : '';
+            const nameCell = dupTag + (c.name || '<span style="color:#aaa">未识别</span>');
+            const wageText = c.daily_wage != null ? `${c.daily_wage} 元/日` : '<span style="color:#aaa">未识别</span>';
+
+            let actions = '';
+            if (isAdmin) {
+                actions = `<div class="actions-cell">
+                    <button class="btn-sm btn-edit-sm" onclick="openEditModal(${c.id},'${(c.name||'').replace(/'/g,"\\'")}','${c.id_card||''}','${c.original_filename||''}')">编辑</button>
+                    <button class="btn-sm btn-reocr-sm" onclick="doReOcr(${c.id})">重新识别</button>
+                    <button class="btn-sm btn-replace-sm" onclick="doReplaceFile(${c.id})">替换</button>
+                    <button class="btn-sm btn-danger-sm" onclick="doDeleteContract(${c.id},'${(c.name||c.original_filename).replace(/'/g,"\\'")}')">删除</button>
+                </div>`;
+            }
+
+            return `<tr>
+                <td><input type="checkbox" ${checked} onchange="toggleSelect(${c.id},this.checked)"></td>
+                <td>${nameCell}</td>
+                <td style="font-family:monospace;font-size:12px">${c.id_card || '-'}</td>
+                <td>${wageText}</td>
+                <td>${templateTag}</td>
+                <td>${matchTag}</td>
+                <td style="font-size:12px;color:#888">${c.original_filename}</td>
+                <td style="font-size:12px;color:#888">${formatDate(c.uploaded_at)}</td>
+                <td>${actions}</td>
+            </tr>`;
+        }).join('');
+
+        const sortIcon = key => {
+            if (sortKey === key) return `<span class="sort-icon"></span>`;
+            return `<span class="sort-icon"></span>`;
+        };
+        const thClass = key => {
+            if (sortKey !== key) return 'sortable';
+            return sortAsc ? 'sortable sort-asc' : 'sortable sort-desc';
+        };
+
+        document.getElementById('contracts-table').innerHTML = `
+            <div style="overflow-x:auto">
+            <table>
+                <thead><tr>
+                    <th style="width:36px"><input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleSelectAll(this.checked)"></th>
+                    <th class="${thClass('name')}" onclick="sortBy('name')">姓名<span class="sort-icon"></span></th>
+                    <th>身份证</th>
+                    <th class="${thClass('daily_wage')}" onclick="sortBy('daily_wage')">日工资<span class="sort-icon"></span></th>
+                    <th>模板</th>
+                    <th>匹配状态</th>
+                    <th>文件名</th>
+                    <th class="${thClass('uploaded_at')}" onclick="sortBy('uploaded_at')">上传时间<span class="sort-icon"></span></th>
+                    <th>操作</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`;
+
+        // 修正排序图标样式（表头已渲染后重新设置）
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const key = th.getAttribute('onclick')?.match(/sortBy\('(\w+)'\)/)?.[1];
+            if (key === sortKey) {
+                th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+                th.classList.remove(sortAsc ? 'sort-desc' : 'sort-asc');
+            }
+        });
+    }
+
+    function sortBy(key) {
+        if (sortKey === key) sortAsc = !sortAsc;
+        else { sortKey = key; sortAsc = true; }
+        renderContracts();
+    }
+
+    function toggleSelectAll(checked) {
+        allContracts.forEach(c => checked ? selectedIds.add(c.id) : selectedIds.delete(c.id));
+        updateBulkBar();
+        renderContracts();
+    }
+
+    function toggleSelect(id, checked) {
+        checked ? selectedIds.add(id) : selectedIds.delete(id);
+        updateBulkBar();
+    }
+
+    function clearSelection() {
+        selectedIds.clear();
+        updateBulkBar();
+        renderContracts();
+    }
+
+    function updateBulkBar() {
+        const n = selectedIds.size;
+        const bar = document.getElementById('bulk-bar');
+        if (n > 0) {
+            bar.classList.add('show');
+            document.getElementById('bulk-count').textContent = `已选 ${n} 条`;
+        } else {
+            bar.classList.remove('show');
+        }
+    }
+
+    async function doBulkDelete() {
+        const ids = [...selectedIds];
+        if (ids.length === 0) return;
+        if (!confirm(`确认删除选中的 ${ids.length} 份协议？此操作不可恢复。`)) return;
+        try {
+            const res = await bulkDeleteContracts(ids);
+            showToast(`已删除 ${res.deleted} 份协议`, 'success');
+            selectedIds.clear();
+            updateBulkBar();
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('批量删除失败: ' + e.message, 'error');
+        }
+    }
+
+    // 编辑弹窗
+    function openEditModal(id, name, idCard, filename) {
+        editingId = id;
+        document.getElementById('edit-modal-sub').textContent = `文件：${filename}`;
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-idcard').value = idCard;
+        document.getElementById('edit-modal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').style.display = 'none';
+        editingId = null;
+    }
+
+    async function submitEdit() {
+        if (!editingId) return;
+        const name = document.getElementById('edit-name').value.trim();
+        const idCard = document.getElementById('edit-idcard').value.trim();
+        try {
+            await editContract(editingId, name || null, idCard || null);
+            showToast('保存成功', 'success');
+            closeEditModal();
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('保存失败: ' + e.message, 'error');
+        }
+    }
+
+    // 重新识别
+    async function doReOcr(id) {
+        if (!confirm('重新运行OCR识别？这可能需要几秒钟。')) return;
+        try {
+            showToast('识别中，请稍候...', 'info');
+            await reOcrContract(id);
+            showToast('重新识别完成', 'success');
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('识别失败: ' + e.message, 'error');
+        }
+    }
+
+    // 替换PDF
+    function doReplaceFile(id) {
+        replacingId = id;
+        const input = document.getElementById('replace-input');
+        input.value = '';
+        input.click();
+    }
+
+    async function submitReplace(file) {
+        if (!file || !replacingId) return;
+        if (!confirm(`替换为 ${file.name}？将重新OCR识别，原有识别结果会被覆盖。`)) return;
+        try {
+            showToast('上传并识别中...', 'info');
+            await replaceContractFile(replacingId, file);
+            showToast('替换成功', 'success');
+            replacingId = null;
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('替换失败: ' + e.message, 'error');
+        }
+    }
+
+    // 单条删除
+    async function doDeleteContract(id, name) {
+        if (!confirm(`确认删除【${name}】的用工协议？此操作不可恢复。`)) return;
+        try {
+            await deleteContract(id);
+            showToast('协议已删除', 'success');
+            selectedIds.delete(id);
+            updateBulkBar();
+            await loadStats();
+            await loadContracts();
+        } catch(e) {
+            showToast('删除失败: ' + e.message, 'error');
+        }
+    }
+
+    // 上传处理
     async function handleUpload(files) {
         if (!files || files.length === 0) return;
         const fileArr = Array.from(files);
 
         document.getElementById('upload-progress').style.display = 'block';
         document.getElementById('upload-result').innerHTML = '';
+        document.getElementById('fail-summary').style.display = 'none';
         document.getElementById('progress-fill').style.width = '0%';
         document.getElementById('progress-text').textContent = `正在处理 ${fileArr.length} 份协议，OCR识别中，请耐心等待...`;
 
-        // 分批上传，每批5个
         const batchSize = 5;
         const results = [];
         const startTime = Date.now();
@@ -274,15 +542,13 @@
             const hh = finishTime.getHours().toString().padStart(2, '0');
             const mm = finishTime.getMinutes().toString().padStart(2, '0');
             const remMin = Math.ceil(remaining / 60);
-            const timeStr = done < fileArr.length
-                ? `，预计还需 ${remMin} 分钟，${hh}:${mm} 完成`
-                : '';
+            const timeStr = done < fileArr.length ? `，预计还需 ${remMin} 分钟，${hh}:${mm} 完成` : '';
             document.getElementById('progress-text').textContent = `已处理 ${done} / ${fileArr.length} 份${timeStr}`;
         }
 
         document.getElementById('upload-progress').style.display = 'none';
 
-        // 显示结果
+        // 结果摘要
         const html = results.map(r => {
             if (r.error && !r.id) {
                 return `<div class="result-item err">❌ ${r.filename || r.original_filename}: ${r.error}</div>`;
@@ -296,21 +562,74 @@
         }).join('');
         document.getElementById('upload-result').innerHTML = html;
 
-        // 刷新列表和统计
+        // 未识别汇总
+        const failedList = results.filter(r => r.id && (!r.name || !r.id_card));
+        failedContractIds = failedList.map(r => r.id).filter(Boolean);
+        if (failedList.length > 0) {
+            document.getElementById('fail-summary-title').textContent =
+                `⚠️ 以下 ${failedList.length} 份合同姓名或身份证未能识别，可重新识别：`;
+            document.getElementById('fail-list').innerHTML =
+                failedList.map(r => `<div>${r.original_filename || r.name}</div>`).join('');
+            document.getElementById('fail-summary').style.display = 'block';
+        }
+
         await loadStats();
         await loadContracts();
         document.getElementById('upload-input').value = '';
     }
 
-    async function doDeleteContract(id, name) {
-        if (!confirm(`确认删除【${name}】的用工协议？此操作不可恢复。`)) return;
+    // 一键重新识别所有未识别合同
+    async function reOcrAllFailed() {
+        if (failedContractIds.length === 0) return;
+        if (!confirm(`对 ${failedContractIds.length} 份未识别合同重新运行OCR？这需要较长时间。`)) return;
+        let done = 0;
+        const btn = document.querySelector('#fail-summary button');
+        for (const id of failedContractIds) {
+            try {
+                await reOcrContract(id);
+                done++;
+                btn.textContent = `重新识别中 ${done}/${failedContractIds.length}...`;
+            } catch(e) {}
+        }
+        showToast(`重新识别完成，共处理 ${done} 份`, 'success');
+        document.getElementById('fail-summary').style.display = 'none';
+        failedContractIds = [];
+        await loadStats();
+        await loadContracts();
+    }
+
+    // 查缺
+    function doCheckMissing() {
+        document.getElementById('missing-result').style.display = 'none';
+        document.getElementById('check-input').value = '';
+        document.getElementById('check-input').click();
+    }
+
+    async function handleCheckMissing(files) {
+        if (!files || files.length === 0) return;
+        const filenames = Array.from(files).map(f => f.name);
         try {
-            await deleteContract(id);
-            showToast('协议已删除', 'success');
-            await loadStats();
-            await loadContracts();
+            const res = await checkMissingContracts(filenames);
+            const el = document.getElementById('missing-result');
+            const title = document.getElementById('missing-title');
+            const list = document.getElementById('missing-list');
+            if (res.missing_count === 0) {
+                title.textContent = `✅ 全部 ${res.total} 份文件均已在库中`;
+                list.innerHTML = '';
+                el.style.background = '#d4edda';
+                el.style.borderColor = '#28a745';
+                title.style.color = '#155724';
+            } else {
+                title.textContent = `⚠️ 以下 ${res.missing_count} 份文件不在库中（共选择 ${res.total} 份）`;
+                list.innerHTML = res.missing.map(f => `<div>${f}</div>`).join('');
+                el.style.background = '#fce8e8';
+                el.style.borderColor = '#dc3545';
+                title.style.color = '#c0392b';
+            }
+            el.style.display = 'block';
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch(e) {
-            showToast('删除失败: ' + e.message, 'error');
+            showToast('查缺失败: ' + e.message, 'error');
         }
     }
 

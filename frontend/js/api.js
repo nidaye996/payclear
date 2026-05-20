@@ -289,6 +289,28 @@ async function getContractByIdCard(idCard) {
     return await api.get(`/contracts/by-worker/${idCard}`);
 }
 
+async function editContract(id, name, idCard) {
+    return await api.put(`/contracts/${id}`, { name, id_card: idCard });
+}
+
+async function reOcrContract(id) {
+    return await api.post(`/contracts/${id}/reocr`, {});
+}
+
+async function replaceContractFile(id, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return await api.postForm(`/contracts/${id}/replace`, formData);
+}
+
+async function bulkDeleteContracts(ids) {
+    return await api.post('/contracts/bulk-delete', { ids });
+}
+
+async function checkMissingContracts(filenames) {
+    return await api.post('/contracts/check-missing', { filenames });
+}
+
 // ==================== 银行联号库 API ====================
 
 async function getBankRoutingStats() {
