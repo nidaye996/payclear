@@ -198,6 +198,7 @@
             <!-- 批量操作栏 -->
             <div class="bulk-bar" id="bulk-bar">
                 <span id="bulk-count">已选 0 条</span>
+                <button class="btn btn-primary" style="padding:5px 14px;font-size:13px" onclick="doBulkReOcr()">批量重新识别</button>
                 <button class="btn btn-danger" style="padding:5px 14px;font-size:13px" onclick="doBulkDelete()">批量删除</button>
                 <button class="btn" style="padding:5px 14px;font-size:13px;background:#e9ecef;color:#555" onclick="clearSelection()">取消选择</button>
             </div>
@@ -428,6 +429,30 @@
         }
     }
 
+    async function doBulkReOcr() {
+        const ids = [...selectedIds];
+        if (ids.length === 0) return;
+        if (!confirm(`对选中的 ${ids.length} 份协议重新运行OCR识别？这需要较长时间。`)) return;
+        let done = 0;
+        const btn = document.querySelector('#bulk-bar .btn-primary');
+        for (const id of ids) {
+            try {
+                const updated = await reOcrContract(id);
+                const idx = allContracts.findIndex(c => c.id === id);
+                if (idx >= 0) allContracts[idx] = updated;
+                done++;
+                btn.textContent = `重新识别中 ${done}/${ids.length}...`;
+                renderContracts();
+            } catch(e) {}
+        }
+        btn.textContent = '批量重新识别';
+        showToast(`重新识别完成，共处理 ${done} 份`, 'success');
+        selectedIds.clear();
+        updateBulkBar();
+        loadStats();
+        renderContracts();
+    }
+
     // 编辑弹窗
     function openEditModal(id, name, idCard, filename) {
         editingId = id;
@@ -447,11 +472,14 @@
         const name = document.getElementById('edit-name').value.trim();
         const idCard = document.getElementById('edit-idcard').value.trim();
         try {
-            await editContract(editingId, name || null, idCard || null);
-            showToast('保存成功', 'success');
+            const updated = await editContract(editingId, name || null, idCard || null);
+            // 直接更新本地数据，立即响应，无需重新拉取整个列表
+            const idx = allContracts.findIndex(c => c.id === editingId);
+            if (idx >= 0) allContracts[idx] = updated;
             closeEditModal();
-            await loadStats();
-            await loadContracts();
+            showToast('保存成功', 'success');
+            renderContracts();
+            loadStats(); // 后台刷新统计，不阻塞UI
         } catch(e) {
             showToast('保存失败: ' + e.message, 'error');
         }
