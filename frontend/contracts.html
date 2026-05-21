@@ -435,13 +435,22 @@
         if (!confirm(`对选中的 ${ids.length} 份协议重新运行OCR识别？这需要较长时间。`)) return;
         let done = 0;
         const btn = document.querySelector('#bulk-bar .btn-primary');
+        const startTime = Date.now();
         for (const id of ids) {
             try {
                 const updated = await reOcrContract(id);
                 const idx = allContracts.findIndex(c => c.id === id);
                 if (idx >= 0) allContracts[idx] = updated;
                 done++;
-                btn.textContent = `重新识别中 ${done}/${ids.length}...`;
+                const elapsed = (Date.now() - startTime) / 1000;
+                const avgPerFile = elapsed / done;
+                const remaining = Math.round(avgPerFile * (ids.length - done));
+                const finishTime = new Date(Date.now() + remaining * 1000);
+                const hh = finishTime.getHours().toString().padStart(2, '0');
+                const mm = finishTime.getMinutes().toString().padStart(2, '0');
+                const remMin = Math.ceil(remaining / 60);
+                const timeStr = done < ids.length ? `，预计还需 ${remMin} 分钟，${hh}:${mm} 完成` : '';
+                btn.textContent = `重新识别中 ${done}/${ids.length}${timeStr}`;
                 renderContracts();
             } catch(e) {}
         }
@@ -612,11 +621,20 @@
         if (!confirm(`对 ${failedContractIds.length} 份未识别合同重新运行OCR？这需要较长时间。`)) return;
         let done = 0;
         const btn = document.querySelector('#fail-summary button');
+        const startTime = Date.now();
         for (const id of failedContractIds) {
             try {
                 await reOcrContract(id);
                 done++;
-                btn.textContent = `重新识别中 ${done}/${failedContractIds.length}...`;
+                const elapsed = (Date.now() - startTime) / 1000;
+                const avgPerFile = elapsed / done;
+                const remaining = Math.round(avgPerFile * (failedContractIds.length - done));
+                const finishTime = new Date(Date.now() + remaining * 1000);
+                const hh = finishTime.getHours().toString().padStart(2, '0');
+                const mm = finishTime.getMinutes().toString().padStart(2, '0');
+                const remMin = Math.ceil(remaining / 60);
+                const timeStr = done < failedContractIds.length ? `，预计还需 ${remMin} 分钟，${hh}:${mm} 完成` : '';
+                btn.textContent = `重新识别中 ${done}/${failedContractIds.length}${timeStr}`;
             } catch(e) {}
         }
         showToast(`重新识别完成，共处理 ${done} 份`, 'success');
