@@ -15,6 +15,7 @@ from schemas import SubmissionOut, SubmissionCreate
 from services.parser import parse_file
 from services.checker import run_check
 from routers.auth import get_current_user, require_admin
+from security import DEFAULT_MAX_UPLOAD_BYTES, read_upload_file, safe_display_filename
 
 router = APIRouter(prefix="/submissions", tags=["月度提交"])
 
@@ -147,7 +148,7 @@ async def upload_file(
     file_path = get_upload_path(submission_id, safe_filename)
 
     with open(file_path, "wb") as f:
-        content = await file.read()
+        content = await read_upload_file(file, DEFAULT_MAX_UPLOAD_BYTES)
         f.write(content)
 
     # 解析文件
@@ -157,7 +158,7 @@ async def upload_file(
     sub_file = SubmissionFile(
         submission_id=submission_id,
         file_type=file_type,
-        original_filename=file.filename,
+        original_filename=safe_display_filename(file.filename),
         file_path=file_path,
         parse_status='done' if not parse_result.get('error') else 'error',
         parse_error=parse_result.get('error'),

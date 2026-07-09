@@ -127,7 +127,7 @@
                     </div>
                     <div class="form-group">
                         <label>密码</label>
-                        <input type="password" id="new-password" placeholder="输入密码（至少6位）">
+                        <input type="password" id="new-password" placeholder="输入密码（至少10位）">
                     </div>
                     <div class="form-group">
                         <label>角色</label>
@@ -186,7 +186,7 @@
         </div>
         <div class="form-group">
             <label>新密码</label>
-            <input type="password" id="edit-password" placeholder="留空则不修改（至少6位）">
+            <input type="password" id="edit-password" placeholder="留空则不修改（至少10位）">
         </div>
         <div class="form-group">
             <label>确认新密码</label>
@@ -338,7 +338,7 @@
         const teamId = document.getElementById('new-user-team').value;
 
         if (!username) { showToast('请输入用户名', 'warning'); return; }
-        if (!password || password.length < 6) { showToast('密码至少6位', 'warning'); return; }
+        if (!password || password.length < 10) { showToast('密码至少10位', 'warning'); return; }
         if (role === 'team_leader' && !teamId) { showToast('请选择所属队伍', 'warning'); return; }
 
         try {
@@ -399,7 +399,7 @@
             return;
         }
         if (password && password.length < 6) {
-            errEl.textContent = '密码至少6位';
+            errEl.textContent = '密码至少10位';
             errEl.style.display = 'block';
             return;
         }

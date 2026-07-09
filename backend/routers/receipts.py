@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Worker, WorkerBankInfo, PaymentReceipt, User
 from routers.auth import get_current_user, require_admin
+from security import DEFAULT_MAX_UPLOAD_BYTES, read_upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,7 @@ async def upload_receipt(
 
     # 临时保存文件
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-        content = await file.read()
+        content = await read_upload_file(file, DEFAULT_MAX_UPLOAD_BYTES)
         tmp.write(content)
         tmp_path = tmp.name
 

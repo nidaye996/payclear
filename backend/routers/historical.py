@@ -25,10 +25,12 @@ from models import User, Worker, WorkerBankInfo, MonthlySubmission, SubmissionFi
 from routers.auth import require_admin, require_admin_or_operator
 from services.parser import parse_file
 from services.checker import check_cross_tables
+from security import DEFAULT_MAX_UPLOAD_BYTES, read_upload_file, safe_display_filename
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/historical", tags=["历史数据导入"])
+ALLOWED_TABLE_EXTENSIONS = {'.docx', '.xlsx', '.xls'}
 
 
 # ==================== PDF 解析工具 ====================
@@ -147,13 +149,15 @@ async def analyze_historical(
             if not file_type or not upload_file:
                 continue
             ext = os.path.splitext(upload_file.filename or '')[1].lower()
+            if ext not in ALLOWED_TABLE_EXTENSIONS:
+                raise HTTPException(status_code=400, detail="历史表格只支持 docx、xlsx 或 xls 文件")
             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                tmp.write(await upload_file.read())
+                tmp.write(await read_upload_file(upload_file, DEFAULT_MAX_UPLOAD_BYTES))
                 tmp_files.append(tmp.name)
                 files_to_process.append({
                     'path': tmp.name,
                     'type': file_type,
-                    'original_name': upload_file.filename,
+                    'original_name': safe_display_filename(upload_file.filename),
                 })
 
         if not files_to_process:
@@ -164,7 +168,7 @@ async def analyze_historical(
         if ext != '.pdf':
             raise HTTPException(status_code=400, detail="回执单请上传PDF文件")
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-            tmp.write(await receipt_file.read())
+            tmp.write(await read_upload_file(receipt_file, DEFAULT_MAX_UPLOAD_BYTES))
             tmp_files.append(tmp.name)
             receipt_tmp_path = tmp.name
 

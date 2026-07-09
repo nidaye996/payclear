@@ -21,7 +21,18 @@ _audit = logging.getLogger("audit")
 
 # JWT 配置
 import os
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-secret-change-in-production")
+from security import require_strong_password
+
+_DEV_SECRET = "dev-only-secret-change-in-production"
+SECRET_KEY = os.environ.get("SECRET_KEY")
+PAYCLEAR_ENV = os.environ.get("PAYCLEAR_ENV", "production").lower()
+if not SECRET_KEY:
+    if PAYCLEAR_ENV in {"dev", "development", "local"}:
+        SECRET_KEY = _DEV_SECRET
+    else:
+        raise RuntimeError("生产环境必须设置 SECRET_KEY")
+elif SECRET_KEY == _DEV_SECRET and PAYCLEAR_ENV not in {"dev", "development", "local"}:
+    raise RuntimeError("生产环境不能使用默认 SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8小时
 
@@ -93,7 +104,8 @@ LOCKOUT_MINUTES = 15
 
 def _get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
+    trust_proxy = os.environ.get("TRUST_PROXY_HEADERS", "").lower() in {"1", "true", "yes"}
+    if trust_proxy and forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
@@ -197,6 +209,8 @@ def create_user(
     if user_data.role not in ("admin", "operator", "team_leader"):
         raise HTTPException(status_code=400, detail="角色无效，只能是 admin、operator 或 team_leader")
 
+    require_strong_password(user_data.password)
+
     new_user = User(
         username=user_data.username,
         password_hash=get_password_hash(user_data.password),
@@ -245,8 +259,7 @@ def update_user(
         target.username = data.username
 
     if data.password:
-        if len(data.password) < 6:
-            raise HTTPException(status_code=400, detail="密码至少6位")
+        require_strong_password(data.password)
         target.password_hash = get_password_hash(data.password)
 
     db.commit()

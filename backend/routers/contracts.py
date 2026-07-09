@@ -8,12 +8,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import exists, func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import WorkerContract, Worker, User
+from models import WorkerBankInfo, WorkerContract, Worker, User
 from routers.auth import get_current_user, require_admin
+from security import DEFAULT_MAX_UPLOAD_BYTES, read_upload_file, safe_display_filename, safe_storage_filename
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +39,33 @@ class CheckMissingRequest(BaseModel):
     filenames: List[str]
 
 
+ALLOWED_CONTRACT_EXTENSIONS = {'.pdf'}
+
+
 def _save_file(file_content: bytes, filename: str, contract_id: int) -> str:
     sub_dir = os.path.join(CONTRACTS_DIR, str(contract_id))
     os.makedirs(sub_dir, exist_ok=True)
-    file_path = os.path.join(sub_dir, filename)
+    storage_name = safe_storage_filename(filename, "contract", ALLOWED_CONTRACT_EXTENSIONS)
+    file_path = os.path.join(sub_dir, storage_name)
     with open(file_path, "wb") as f:
         f.write(file_content)
     return file_path
+
+
+def _visible_contract_query(db: Session, user: User):
+    """限制普通队伍负责人只能看到自己队伍已匹配工人的合同。"""
+    query = db.query(WorkerContract)
+    if user.role in ("admin", "operator"):
+        return query
+    if not user.team_id:
+        return query.filter(False)
+    return query.filter(
+        WorkerContract.worker_id.isnot(None),
+        exists().where(
+            (WorkerBankInfo.worker_id == WorkerContract.worker_id) &
+            (WorkerBankInfo.team_id == user.team_id)
+        )
+    )
 
 
 def _contract_to_dict(c: WorkerContract, db: Session) -> dict:
@@ -108,10 +129,10 @@ async def upload_contracts(
     results = []
     for file in files:
         if not (file.filename or '').lower().endswith('.pdf'):
-            results.append({"filename": file.filename, "error": "只支持PDF格式"})
+            results.append({"filename": safe_display_filename(file.filename), "error": "只支持PDF格式"})
             continue
 
-        content = await file.read()
+        content = await read_upload_file(file, DEFAULT_MAX_UPLOAD_BYTES)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
             tmp.write(content)
@@ -136,7 +157,7 @@ async def upload_contracts(
             id_card=ocr_result.get('id_card', ''),
             name=ocr_result.get('name', ''),
             daily_wage=ocr_result.get('daily_wage'),
-            original_filename=file.filename,
+            original_filename=safe_display_filename(file.filename),
             template_valid=ocr_result.get('template_valid', False),
             missing_keywords=','.join(ocr_result.get('missing_keywords', [])),
             ocr_status='failed' if ocr_result.get('error') else 'done',
@@ -163,15 +184,26 @@ def contract_stats(
 ):
     """协议统计"""
     from sqlalchemy import text
-    total = db.query(WorkerContract).count()
-    matched = db.query(WorkerContract).filter(WorkerContract.worker_id.isnot(None)).count()
-    invalid_template = db.query(WorkerContract).filter(
+    query = _visible_contract_query(db, current_user)
+    total = query.count()
+    matched = query.filter(WorkerContract.worker_id.isnot(None)).count()
+    invalid_template = query.filter(
         WorkerContract.template_valid == False  # noqa: E712
     ).count()
-    no_contract = db.execute(text(
-        "SELECT COUNT(*) FROM workers w WHERE NOT EXISTS "
-        "(SELECT 1 FROM worker_contracts c WHERE c.worker_id = w.id)"
-    )).scalar()
+    if current_user.role in ("admin", "operator"):
+        no_contract = db.execute(text(
+            "SELECT COUNT(*) FROM workers w WHERE NOT EXISTS "
+            "(SELECT 1 FROM worker_contracts c WHERE c.worker_id = w.id)"
+        )).scalar()
+    elif current_user.team_id:
+        no_contract = db.execute(text(
+            "SELECT COUNT(DISTINCT w.id) FROM workers w "
+            "JOIN worker_bank_info b ON b.worker_id = w.id "
+            "WHERE b.team_id = :team_id AND NOT EXISTS "
+            "(SELECT 1 FROM worker_contracts c WHERE c.worker_id = w.id)"
+        ), {"team_id": current_user.team_id}).scalar()
+    else:
+        no_contract = 0
     return {
         "total": total,
         "matched": matched,
@@ -206,7 +238,7 @@ def bulk_delete_contracts(
 @router.post("/check-missing")
 def check_missing_contracts(
     body: CheckMissingRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """检查哪些文件名在数据库中不存在"""
@@ -231,7 +263,7 @@ def list_contracts(
     db: Session = Depends(get_db),
 ):
     """获取用工协议列表"""
-    query = db.query(WorkerContract)
+    query = _visible_contract_query(db, current_user)
 
     if search:
         query = query.filter(
@@ -331,7 +363,7 @@ async def replace_contract_file(
     if not (file.filename or '').lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="只支持PDF格式")
 
-    content = await file.read()
+    content = await read_upload_file(file, DEFAULT_MAX_UPLOAD_BYTES)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
         tmp.write(content)
@@ -347,7 +379,7 @@ async def replace_contract_file(
 
     file_path = _save_file(content, file.filename, contract_id)
     contract.file_path = file_path
-    contract.original_filename = file.filename
+    contract.original_filename = safe_display_filename(file.filename)
     _apply_ocr_result(contract, ocr_result, db)
     db.commit()
     db.refresh(contract)
@@ -382,7 +414,7 @@ def get_contract_by_id_card(
     db: Session = Depends(get_db),
 ):
     """按身份证号查询协议"""
-    contracts = db.query(WorkerContract).filter(
+    contracts = _visible_contract_query(db, current_user).filter(
         WorkerContract.id_card == id_card
     ).all()
     return [_contract_to_dict(c, db) for c in contracts]

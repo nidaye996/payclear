@@ -19,6 +19,7 @@ import models  # 触发模型注册
 
 from routers import auth, teams, workers, submissions, reports, historical, backup, announcements, contracts
 from routers.auth import get_current_user, require_admin, require_admin_or_operator
+from security import DEFAULT_MAX_UPLOAD_BYTES, read_upload_file
 from models import User, BankRouting
 
 # 日志配置
@@ -56,7 +57,7 @@ async def lifespan(app: FastAPI):
     # 向后兼容：给已有的 worker_bank_info 表添加 status 列（若不存在）
     _migrate_db()
 
-    # 初始化默认管理员账号
+    # 初始化首个管理员账号
     _init_admin()
 
     yield
@@ -105,24 +106,33 @@ def _migrate_db():
 
 
 def _init_admin():
-    """初始化默认管理员账号"""
+    """按环境变量初始化首个管理员账号。"""
     from database import SessionLocal
     from routers.auth import get_password_hash
+    from security import require_strong_password
 
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(User.username == "admin").first()
-        if not existing:
-            admin = User(
-                username="admin",
-                password_hash=get_password_hash("admin123"),
-                role="admin",
-            )
-            db.add(admin)
-            db.commit()
-            logger.info("默认管理员账号创建成功: admin / admin123")
-        else:
-            logger.info("管理员账号已存在")
+        existing_admin = db.query(User).filter(User.role == "admin", User.is_active == True).first()
+        if existing_admin:
+            logger.info("管理员账号已存在，跳过初始化")
+            return
+
+        username = os.environ.get("INITIAL_ADMIN_USERNAME")
+        password = os.environ.get("INITIAL_ADMIN_PASSWORD")
+        if not username or not password:
+            logger.warning("未发现管理员账号；如需初始化，请设置 INITIAL_ADMIN_USERNAME 和 INITIAL_ADMIN_PASSWORD")
+            return
+
+        require_strong_password(password)
+        admin = User(
+            username=username.strip(),
+            password_hash=get_password_hash(password),
+            role="admin",
+        )
+        db.add(admin)
+        db.commit()
+        logger.info("初始化管理员账号创建成功: %s；请删除 INITIAL_ADMIN_PASSWORD 后重启服务", admin.username)
     except Exception as e:
         logger.error(f"初始化管理员失败: {e}")
         db.rollback()
@@ -198,7 +208,7 @@ async def import_bank_routing(
 
     # 临时保存文件
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-        content = await file.read()
+        content = await read_upload_file(file, DEFAULT_MAX_UPLOAD_BYTES)
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -306,7 +316,7 @@ def _check_workers_against_routing(db: Session, bank_db: Session) -> dict:
 
 @app.get("/api/bank-routing/check-workers")
 def check_workers_routing(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin_or_operator),
     db: Session = Depends(get_db),
     bank_db: Session = Depends(get_bank_db),
 ):

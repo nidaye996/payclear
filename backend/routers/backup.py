@@ -1,7 +1,7 @@
 """
 数据备份与恢复路由
-GET  /api/backup/download  - 下载备份 zip（所有角色）
-POST /api/backup/restore   - 上传恢复备份（所有角色）
+GET  /api/backup/download  - 下载备份 zip（管理员）
+POST /api/backup/restore   - 上传恢复备份（管理员）
 """
 import os
 import json
@@ -13,13 +13,14 @@ from datetime import datetime
 
 _audit = logging.getLogger("audit")
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from database import get_db, engine, DATA_DIR
 from models import User
-from routers.auth import get_current_user
+from routers.auth import require_admin
+from security import MAX_BACKUP_UPLOAD_BYTES, read_upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ DB_PATH = os.path.join(DATA_DIR, "salary.db")
 
 @router.get("/download")
 def backup_download(
-    current_user: User = Depends(get_current_user),
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_admin),
 ):
     """
     下载数据备份（zip 格式，含 salary.db + 备份信息）
@@ -69,6 +71,7 @@ def backup_download(
             zf.writestr("backup_info.json", json.dumps(backup_info, ensure_ascii=False, indent=2))
 
         os.unlink(tmp_db.name)
+        background_tasks.add_task(os.unlink, tmp_zip.name)
 
         _audit.info("BACKUP_DOWNLOAD by=%s file=%s", current_user.username, zip_filename)
         return FileResponse(
@@ -76,7 +79,7 @@ def backup_download(
             media_type="application/zip",
             filename=zip_filename,
             headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
-            background=None,
+            background=background_tasks,
         )
 
     except Exception as e:
@@ -91,7 +94,7 @@ def backup_download(
 @router.post("/restore")
 async def backup_restore(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """
     恢复数据备份（上传 zip 文件，替换当前数据库）
@@ -103,7 +106,7 @@ async def backup_restore(
 
     tmp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
     try:
-        tmp_zip.write(await file.read())
+        tmp_zip.write(await read_upload_file(file, MAX_BACKUP_UPLOAD_BYTES))
         tmp_zip.close()
 
         # 验证 zip 内容
