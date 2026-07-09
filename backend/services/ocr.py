@@ -131,6 +131,31 @@ def _check_template(text: str) -> tuple:
     return len(missing) <= 1, missing
 
 
+def parse_contract_pages(pages, ocr_page=_ocr_page) -> Dict[str, Any]:
+    """识别合同页面；模板初检失败时仅重试正文页面的较高分辨率 OCR。"""
+    page1_text = ocr_page(pages[0], OCR_RESOLUTION)
+    body_pages = pages[1:5]
+    body_text = ''.join(ocr_page(page, OCR_RESOLUTION) + '\n' for page in body_pages)
+    template_valid, missing_keywords = _check_template(body_text)
+    daily_wage = _extract_daily_wage(body_text)
+
+    if not template_valid and body_pages:
+        high_precision_text = ''.join(ocr_page(page, 200) + '\n' for page in body_pages)
+        high_template_valid, high_missing_keywords = _check_template(high_precision_text)
+        if high_template_valid:
+            template_valid = high_template_valid
+            missing_keywords = high_missing_keywords
+            daily_wage = _extract_daily_wage(high_precision_text) or daily_wage
+
+    return {
+        'name': _extract_name(page1_text),
+        'id_card': _extract_id_card(page1_text),
+        'daily_wage': daily_wage,
+        'template_valid': template_valid,
+        'missing_keywords': missing_keywords,
+    }
+
+
 def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
     """
     解析用工协议 PDF。
@@ -160,21 +185,7 @@ def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
     try:
         with pdfplumber.open(file_path) as pdf:
             validate_contract_pdf_pages([(page.width, page.height) for page in pdf.pages])
-
-            # 第1页：识别姓名和身份证号
-            page1_text = _ocr_page(pdf.pages[0])
-            result['name'] = _extract_name(page1_text)
-            result['id_card'] = _extract_id_card(page1_text)
-
-            # 第2-5页：找日工资 + 验模板
-            body_text = ''
-            for page in pdf.pages[1:5]:
-                body_text += _ocr_page(page) + '\n'
-
-            result['daily_wage'] = _extract_daily_wage(body_text)
-            template_valid, missing_kws = _check_template(body_text)
-            result['template_valid'] = template_valid
-            result['missing_keywords'] = missing_kws
+            result.update(parse_contract_pages(pdf.pages))
 
     except Exception as e:
         logger.error(f"解析合同PDF失败 {file_path}: {e}", exc_info=True)
