@@ -286,7 +286,7 @@
             renderResult(result);
         } catch(e) {
             document.getElementById('upload-result').innerHTML =
-                `<div class="alert alert-warning">解析失败：${e.message}</div>`;
+                `<div class="alert alert-warning">解析失败：${escapeHtml(e.message)}</div>`;
             showToast('解析失败：' + e.message, 'error');
         } finally {
             btn.disabled = false;
@@ -320,7 +320,7 @@
         `;
 
         if (result.message) {
-            html += `<div class="alert alert-success">${result.message}</div>`;
+            html += `<div class="alert alert-success">${escapeHtml(result.message)}</div>`;
         }
 
         // 成功工人列表
@@ -328,9 +328,9 @@
         if (successWorkers.length > 0) {
             const rows = successWorkers.map(w => `
                 <tr>
-                    <td>${w.name}</td>
-                    <td>${w.worker_name_db || '-'}</td>
-                    <td style="font-family:monospace;font-size:12px">${w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-'}</td>
+                    <td>${escapeHtml(w.name)}</td>
+                    <td>${escapeHtml(w.worker_name_db || '-')}</td>
+                    <td style="font-family:monospace;font-size:12px">${escapeHtml(w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-')}</td>
                     <td style="color:#27ae60;font-weight:600">￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
                     <td><span class="badge badge-success">打款成功</span></td>
                     <td><span class="badge badge-confirmed">已入正式库</span></td>
@@ -350,9 +350,9 @@
         if (failWorkers.length > 0) {
             const rows = failWorkers.map(w => `
                 <tr>
-                    <td>${w.name}</td>
-                    <td>${w.worker_name_db || '-'}</td>
-                    <td style="font-family:monospace;font-size:12px">${w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-'}</td>
+                    <td>${escapeHtml(w.name)}</td>
+                    <td>${escapeHtml(w.worker_name_db || '-')}</td>
+                    <td style="font-family:monospace;font-size:12px">${escapeHtml(w.bank_card ? w.bank_card.slice(0,4)+'****'+w.bank_card.slice(-4) : '-')}</td>
                     <td style="color:#e74c3c;font-weight:600">￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
                     <td><span class="badge badge-fail">打款失败</span></td>
                     <td><span class="badge badge-pending">仍在暂存库</span></td>
@@ -372,11 +372,11 @@
         if (unmatched.length > 0) {
             const rows = unmatched.map(w => `
                 <tr>
-                    <td>${w.name}</td>
-                    <td style="font-family:monospace;font-size:12px">${w.bank_card}</td>
+                    <td>${escapeHtml(w.name)}</td>
+                    <td style="font-family:monospace;font-size:12px">${escapeHtml(w.bank_card)}</td>
                     <td>￥${(w.amount || 0).toLocaleString('zh-CN', {minimumFractionDigits:2})}</td>
-                    <td>${w.status}</td>
-                    <td style="color:#e67e22;font-size:12px">${w.reason || '未匹配到工人'}</td>
+                    <td>${escapeHtml(w.status)}</td>
+                    <td style="color:#e67e22;font-size:12px">${escapeHtml(w.reason || '未匹配到工人')}</td>
                 </tr>
             `).join('');
             html += `
@@ -410,7 +410,7 @@
                 <tr>
                     <td>${r.id}</td>
                     <td>${formatDate(r.uploaded_at)}</td>
-                    <td>${r.uploader_name}</td>
+                    <td>${escapeHtml(r.uploader_name)}</td>
                     <td>${r.total_count}</td>
                     <td style="color:#27ae60;font-weight:600">${r.success_count}</td>
                     <td style="color:#e74c3c;font-weight:600">${r.fail_count}</td>
@@ -435,7 +435,7 @@
             `;
         } catch(e) {
             document.getElementById('history-container').innerHTML =
-                `<div class="loading" style="color:#dc3545">加载失败: ${e.message}</div>`;
+                `<div class="loading" style="color:#dc3545">加载失败: ${escapeHtml(e.message)}</div>`;
         }
     }
 

@@ -130,10 +130,10 @@ def delete_report(
 @router.get("/{report_id}/export")
 def export_report_excel(
     report_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """导出报告为Excel"""
+    """导出报告为Excel（管理员）"""
     report = db.query(CheckReport).filter(CheckReport.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
@@ -141,9 +141,6 @@ def export_report_excel(
     submission = db.query(MonthlySubmission).filter(
         MonthlySubmission.id == report.submission_id
     ).first()
-
-    if current_user.role not in ("admin", "operator") and submission.team_id != current_user.team_id:
-        raise HTTPException(status_code=403, detail="无权导出此报告")
 
     try:
         report_data = json.loads(report.report_data) if report.report_data else {}

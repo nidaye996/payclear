@@ -473,10 +473,10 @@
 
             const rows = recent.map(s => `
                 <tr>
-                    <td>${teamMap[s.team_id] || '队伍#' + s.team_id}</td>
+                    <td>${escapeHtml(teamMap[s.team_id] || '队伍#' + s.team_id)}</td>
                     <td>${s.year}年${s.month}月</td>
                     <td>${s.files?.length || 0} 个文件</td>
-                    <td>${statusMap[s.status] || s.status}</td>
+                    <td>${statusMap[s.status] || escapeHtml(s.status)}</td>
                     <td>${formatDate(s.submitted_at)}</td>
                     <td><a href="/upload.html?submission_id=${s.id}" class="btn-link">查看</a></td>
                 </tr>
@@ -501,7 +501,7 @@
     function buildRow(teamName, sub, report) {
         if (!sub) {
             return `<tr>
-                <td>${teamName}</td>
+                <td>${escapeHtml(teamName)}</td>
                 <td><span class="status-badge status-error">未提交</span></td>
                 <td>-</td>
                 <td>-</td>
@@ -515,7 +515,7 @@
             'done': '<span class="status-badge status-done">已完成</span>',
             'error': '<span class="status-badge status-error">有错误</span>',
         };
-        const statusBadge = statusMap[sub.status] || sub.status;
+        const statusBadge = statusMap[sub.status] || escapeHtml(sub.status);
 
         let issueCell = '-';
         let actionCell = `<a href="/upload.html?submission_id=${sub.id}" class="btn-link">查看提交</a>`;
@@ -531,7 +531,7 @@
         }
 
         return `<tr>
-            <td>${teamName}</td>
+            <td>${escapeHtml(teamName)}</td>
             <td><span class="status-badge status-done">已提交</span></td>
             <td>${statusBadge}</td>
             <td>${issueCell}</td>

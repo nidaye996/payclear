@@ -598,10 +598,13 @@
                     const exportLink = document.getElementById('export-report-link');
                     viewLink.href = `/report.html?id=${myReport.id}`;
                     viewLink.target = '_blank';
-                    exportLink.onclick = (e) => {
-                        e.preventDefault();
-                        exportReport(myReport.id).catch(err => showToast('导出失败: ' + err.message, 'error'));
-                    };
+                    exportLink.style.display = isAdmin() ? 'inline' : 'none';
+                    if (isAdmin()) {
+                        exportLink.onclick = (e) => {
+                            e.preventDefault();
+                            exportReport(myReport.id).catch(err => showToast('导出失败: ' + err.message, 'error'));
+                        };
+                    }
                     document.getElementById('report-link').style.display = 'block';
 
                     // 显示入库按钮

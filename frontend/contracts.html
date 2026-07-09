@@ -280,7 +280,7 @@
             renderContracts();
         } catch(e) {
             document.getElementById('contracts-table').innerHTML =
-                `<div class="empty" style="color:#dc3545">加载失败: ${e.message}</div>`;
+                `<div class="empty" style="color:#dc3545">加载失败: ${escapeHtml(e.message)}</div>`;
         }
     }
 
@@ -309,34 +309,34 @@
                 : '';
             const templateTag = c.template_valid
                 ? '<span class="tag tag-green">✓ 合规</span>'
-                : `<span class="tag tag-red" title="${templateTitle}" style="${templateTitle ? 'cursor:help' : ''}">✗ 不合规</span>`;
+                : `<span class="tag tag-red" title="${escapeAttr(templateTitle)}" style="${templateTitle ? 'cursor:help' : ''}">✗ 不合规</span>`;
             const matchTag = c.worker_matched
-                ? `<span class="tag tag-green">✓ ${c.worker_name_in_db || c.name}</span>`
+                ? `<span class="tag tag-green">✓ ${escapeHtml(c.worker_name_in_db || c.name)}</span>`
                 : '<span class="tag tag-orange">未匹配</span>';
             const dupTag = c.has_duplicate
                 ? '<span class="tag tag-red" title="同一身份证存在多份协议，请核查">重复</span> '
                 : '';
-            const nameCell = dupTag + (c.name || '<span style="color:#aaa">未识别</span>');
-            const wageText = c.daily_wage != null ? `${c.daily_wage} 元/日` : '<span style="color:#aaa">未识别</span>';
+            const nameCell = dupTag + (c.name ? escapeHtml(c.name) : '<span style="color:#aaa">未识别</span>');
+            const wageText = c.daily_wage != null ? `${escapeHtml(c.daily_wage)} 元/日` : '<span style="color:#aaa">未识别</span>';
 
             let actions = '';
             if (isAdmin) {
                 actions = `<div class="actions-cell">
-                    <button class="btn-sm btn-edit-sm" onclick="openEditModal(${c.id},'${(c.name||'').replace(/'/g,"\\'")}','${c.id_card||''}','${c.original_filename||''}')">编辑</button>
+                    <button class="btn-sm btn-edit-sm" onclick="openEditModal(${c.id})">编辑</button>
                     <button class="btn-sm btn-reocr-sm" onclick="doReOcr(${c.id})">重新识别</button>
                     <button class="btn-sm btn-replace-sm" onclick="doReplaceFile(${c.id})">替换</button>
-                    <button class="btn-sm btn-danger-sm" onclick="doDeleteContract(${c.id},'${(c.name||c.original_filename).replace(/'/g,"\\'")}')">删除</button>
+                    <button class="btn-sm btn-danger-sm" onclick="doDeleteContract(${c.id})">删除</button>
                 </div>`;
             }
 
             return `<tr>
                 <td><input type="checkbox" ${checked} onchange="toggleSelect(${c.id},this.checked)"></td>
                 <td>${nameCell}</td>
-                <td style="font-family:monospace;font-size:12px">${c.id_card || '-'}</td>
+                <td style="font-family:monospace;font-size:12px">${escapeHtml(c.id_card || '-')}</td>
                 <td>${wageText}</td>
                 <td>${templateTag}</td>
                 <td>${matchTag}</td>
-                <td style="font-size:12px;color:#888">${c.original_filename}</td>
+                <td style="font-size:12px;color:#888">${escapeHtml(c.original_filename || '-')}</td>
                 <td style="font-size:12px;color:#888">${formatDate(c.uploaded_at)}</td>
                 <td>${actions}</td>
             </tr>`;
@@ -463,11 +463,12 @@
     }
 
     // 编辑弹窗
-    function openEditModal(id, name, idCard, filename) {
+    function openEditModal(id) {
+        const contract = allContracts.find(c => c.id === id) || {};
         editingId = id;
-        document.getElementById('edit-modal-sub').textContent = `文件：${filename}`;
-        document.getElementById('edit-name').value = name;
-        document.getElementById('edit-idcard').value = idCard;
+        document.getElementById('edit-modal-sub').textContent = `文件：${contract.original_filename || '-'}`;
+        document.getElementById('edit-name').value = contract.name || '';
+        document.getElementById('edit-idcard').value = contract.id_card || '';
         document.getElementById('edit-modal').style.display = 'flex';
     }
 
@@ -532,7 +533,9 @@
     }
 
     // 单条删除
-    async function doDeleteContract(id, name) {
+    async function doDeleteContract(id) {
+        const contract = allContracts.find(c => c.id === id) || {};
+        const name = contract.name || contract.original_filename || '该协议';
         if (!confirm(`确认删除【${name}】的用工协议？此操作不可恢复。`)) return;
         try {
             await deleteContract(id);
@@ -588,14 +591,14 @@
         // 结果摘要
         const html = results.map(r => {
             if (r.error && !r.id) {
-                return `<div class="result-item err">❌ ${r.filename || r.original_filename}: ${r.error}</div>`;
+                return `<div class="result-item err">❌ ${escapeHtml(r.filename || r.original_filename)}: ${escapeHtml(r.error)}</div>`;
             }
-            const wage = r.daily_wage != null ? `，日工资 ${r.daily_wage} 元` : '';
+            const wage = r.daily_wage != null ? `，日工资 ${escapeHtml(r.daily_wage)} 元` : '';
             const template = r.template_valid ? '' : '，⚠️ 模板不合规';
-            const match = r.worker_matched ? `，✓ 匹配到 ${r.worker_name_in_db}` : '，⚠️ 未在工人库中找到';
+            const match = r.worker_matched ? `，✓ 匹配到 ${escapeHtml(r.worker_name_in_db)}` : '，⚠️ 未在工人库中找到';
             const dup = r.has_duplicate ? '，⚠️ 该工人已有协议' : '';
             const cls = (!r.template_valid || !r.worker_matched || r.has_duplicate) ? 'warn' : 'ok';
-            return `<div class="result-item ${cls}">✓ ${r.name || r.original_filename}${wage}${template}${match}${dup}</div>`;
+            return `<div class="result-item ${cls}">✓ ${escapeHtml(r.name || r.original_filename)}${wage}${template}${match}${dup}</div>`;
         }).join('');
         document.getElementById('upload-result').innerHTML = html;
 
@@ -606,7 +609,7 @@
             document.getElementById('fail-summary-title').textContent =
                 `⚠️ 以下 ${failedList.length} 份合同姓名或身份证未能识别，可重新识别：`;
             document.getElementById('fail-list').innerHTML =
-                failedList.map(r => `<div>${r.original_filename || r.name}</div>`).join('');
+                failedList.map(r => `<div>${escapeHtml(r.original_filename || r.name)}</div>`).join('');
             document.getElementById('fail-summary').style.display = 'block';
         }
 
@@ -667,7 +670,7 @@
                 title.style.color = '#155724';
             } else {
                 title.textContent = `⚠️ 以下 ${res.missing_count} 份文件不在库中（共选择 ${res.total} 份）`;
-                list.innerHTML = res.missing.map(f => `<div>${f}</div>`).join('');
+                list.innerHTML = res.missing.map(f => `<div>${escapeHtml(f)}</div>`).join('');
                 el.style.background = '#fce8e8';
                 el.style.borderColor = '#dc3545';
                 title.style.color = '#c0392b';

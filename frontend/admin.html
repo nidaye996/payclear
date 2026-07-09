@@ -235,7 +235,7 @@
             const result = await importBankRouting(file);
             document.getElementById('overlay').classList.remove('show');
             document.getElementById('bank-import-status').innerHTML =
-                `<span style="color:#28a745">✅ ${result.message}</span>`;
+                `<span style="color:#28a745">✅ ${escapeHtml(result.message)}</span>`;
             await loadBankStats();
             showToast(result.message, 'success');
 
@@ -246,7 +246,7 @@
         } catch(e) {
             document.getElementById('overlay').classList.remove('show');
             document.getElementById('bank-import-status').innerHTML =
-                `<span style="color:#dc3545">❌ 导入失败: ${e.message}</span>`;
+                `<span style="color:#dc3545">❌ 导入失败: ${escapeHtml(e.message)}</span>`;
             showToast('导入失败: ' + e.message, 'error');
         }
 
@@ -272,7 +272,7 @@
             renderWorkerCheckResult(result);
         } catch(e) {
             document.getElementById('worker-check-result').innerHTML =
-                `<div style="color:#dc3545;font-size:13px">❌ ${e.message}</div>`;
+                `<div style="color:#dc3545;font-size:13px">❌ ${escapeHtml(e.message)}</div>`;
         } finally {
             btn.disabled = false;
             btn.textContent = '与联号库比对';
@@ -300,10 +300,10 @@
         } else {
             const rows = issues.map(i => `
                 <tr>
-                    <td>${i.worker_name}</td>
-                    <td style="font-family:monospace;font-size:12px">${i.id_card ? i.id_card.replace(/(.{6}).*(.{4})/, '$1****$2') : '-'}</td>
-                    <td style="font-family:monospace">${i.routing_number || '-'}</td>
-                    <td style="color:${i.issue_type === 'routing_not_found' ? '#dc3545' : '#e67e22'}">${i.issue_desc}</td>
+                    <td>${escapeHtml(i.worker_name)}</td>
+                    <td style="font-family:monospace;font-size:12px">${escapeHtml(i.id_card ? i.id_card.replace(/(.{6}).*(.{4})/, '$1****$2') : '-')}</td>
+                    <td style="font-family:monospace">${escapeHtml(i.routing_number || '-')}</td>
+                    <td style="color:${i.issue_type === 'routing_not_found' ? '#dc3545' : '#e67e22'}">${escapeHtml(i.issue_desc)}</td>
                 </tr>
             `).join('');
             html += `
@@ -336,9 +336,9 @@
 
             const rows = items.map(r => `
                 <tr>
-                    <td style="font-family:monospace">${r.routing_number}</td>
-                    <td>${r.branch_name || '-'}</td>
-                    <td>${r.province || ''}${r.city || ''}</td>
+                    <td style="font-family:monospace">${escapeHtml(r.routing_number)}</td>
+                    <td>${escapeHtml(r.branch_name || '-')}</td>
+                    <td>${escapeHtml((r.province || '') + (r.city || ''))}</td>
                 </tr>
             `).join('');
 
@@ -385,7 +385,7 @@
             URL.revokeObjectURL(url);
             document.getElementById('backup-status').innerHTML = '<span style="color:#28a745">✅ 备份文件已下载</span>';
         } catch(e) {
-            document.getElementById('backup-status').innerHTML = `<span style="color:#dc3545">❌ ${e.message}</span>`;
+            document.getElementById('backup-status').innerHTML = `<span style="color:#dc3545">❌ ${escapeHtml(e.message)}</span>`;
         } finally {
             btn.disabled = false;
         }
@@ -410,11 +410,11 @@
             const result = await api.postForm('/backup/restore', formData);
 
             document.getElementById('restore-status').innerHTML =
-                `<span style="color:#28a745">✅ 恢复成功！备份时间：${result.backup_time || '未知'}，备份人：${result.created_by || '未知'}</span>`;
+                `<span style="color:#28a745">✅ 恢复成功！备份时间：${escapeHtml(result.backup_time || '未知')}，备份人：${escapeHtml(result.created_by || '未知')}</span>`;
             showToast('数据恢复成功，请刷新页面', 'success');
             setTimeout(() => window.location.reload(), 2000);
         } catch(e) {
-            document.getElementById('restore-status').innerHTML = `<span style="color:#dc3545">❌ ${e.message}</span>`;
+            document.getElementById('restore-status').innerHTML = `<span style="color:#dc3545">❌ ${escapeHtml(e.message)}</span>`;
         } finally {
             btn.disabled = false;
         }

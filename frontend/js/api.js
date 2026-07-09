@@ -588,7 +588,7 @@ function _renderAnnList() {
                 <div class="ann-item-content">${escapeHtml(a.content)}</div>
                 ${del}
             </div>
-            <div class="ann-item-meta">${tag}${a.author_name} · ${formatDate(a.created_at)}</div>
+            <div class="ann-item-meta">${tag}${escapeHtml(a.author_name)} · ${formatDate(a.created_at)}</div>
         </div>`;
     }).join('');
 }
@@ -614,7 +614,7 @@ function _showNextFs() {
         <div class="ann-fs-title">系统公告</div>
         ${_fsQueue.length > 1 ? `<div class="ann-fs-counter">还有 ${_fsQueue.length} 条未读公告</div>` : ''}
         <div class="ann-fs-body">${escapeHtml(ann.content)}</div>
-        <div class="ann-fs-meta">${ann.author_name} · ${formatDate(ann.created_at)}</div>
+        <div class="ann-fs-meta">${escapeHtml(ann.author_name)} · ${formatDate(ann.created_at)}</div>
         <button class="ann-fs-read-btn" onclick="_confirmReadFs(${ann.id})">我已阅读</button>
     </div>`;
     ov.style.display = 'flex';
@@ -689,8 +689,17 @@ function showToast(message, type = 'info') {
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(str) {
+    return escapeHtml(str);
 }
 
 function formatDate(dateStr) {

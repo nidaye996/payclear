@@ -285,8 +285,8 @@
 
             const html = allReports.map((r, idx) => {
                 const sub = subMap[r.submission_id] || {};
-                const teamName = teamsMap[sub.team_id] || '未知队伍';
-                const period = sub.year ? `${sub.year}年${sub.month}月` : '未知月份';
+                const teamName = escapeHtml(teamsMap[sub.team_id] || '未知队伍');
+                const period = escapeHtml(sub.year ? `${sub.year}年${sub.month}月` : '未知月份');
 
                 const errBadge = r.error_count > 0
                     ? `<span class="badge badge-error">❌ ${r.error_count}错误</span>`
@@ -323,7 +323,7 @@
 
         } catch(e) {
             document.getElementById('report-list').innerHTML =
-                `<div style="color:#dc3545;padding:16px">加载失败: ${e.message}</div>`;
+                `<div style="color:#dc3545;padding:16px">加载失败: ${escapeHtml(e.message)}</div>`;
         }
     }
 
@@ -340,6 +340,7 @@
 
             document.getElementById('detail-placeholder').style.display = 'none';
             document.getElementById('report-detail').style.display = 'block';
+            document.getElementById('btn-export').style.display = isAdmin() ? 'inline-block' : 'none';
 
             document.getElementById('d-workers').textContent = report.total_workers;
             document.getElementById('d-errors').textContent = report.error_count;
@@ -393,14 +394,14 @@
         const rows = filtered.map((issue, idx) => `
             <tr>
                 <td>${idx + 1}</td>
-                <td>${severityMap[issue.severity] || issue.severity}</td>
-                <td>${typeMap[issue.issue_type] || issue.issue_type}</td>
-                <td><strong>${issue.worker_name}</strong></td>
-                <td style="font-family:monospace">${issue.id_card}</td>
-                <td><strong>${issue.field}</strong></td>
-                <td>${issue.description}</td>
-                <td style="font-size:12px;color:#666">${issue.source_a || '-'}</td>
-                <td style="font-size:12px;color:#666">${issue.source_b || '-'}</td>
+                <td>${severityMap[issue.severity] || escapeHtml(issue.severity)}</td>
+                <td>${escapeHtml(typeMap[issue.issue_type] || issue.issue_type)}</td>
+                <td><strong>${escapeHtml(issue.worker_name)}</strong></td>
+                <td style="font-family:monospace">${escapeHtml(issue.id_card)}</td>
+                <td><strong>${escapeHtml(issue.field)}</strong></td>
+                <td>${escapeHtml(issue.description)}</td>
+                <td style="font-size:12px;color:#666">${escapeHtml(issue.source_a || '-')}</td>
+                <td style="font-size:12px;color:#666">${escapeHtml(issue.source_b || '-')}</td>
             </tr>
         `).join('');
 

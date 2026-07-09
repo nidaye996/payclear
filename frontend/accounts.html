@@ -235,10 +235,10 @@
                 const rows = teamsData.map(t => `
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5">
                         <div>
-                            <strong>${t.name}</strong>
-                            <span style="font-size:12px;color:#888;margin-left:8px">${t.contact_person || ''}</span>
+                            <strong>${escapeHtml(t.name)}</strong>
+                            <span style="font-size:12px;color:#888;margin-left:8px">${escapeHtml(t.contact_person || '')}</span>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="delTeam(${t.id}, '${t.name}')">删除</button>
+                        <button class="btn btn-sm btn-danger" onclick="delTeam(${t.id})">删除</button>
                     </div>
                 `).join('');
                 document.getElementById('team-list').innerHTML = rows;
@@ -255,7 +255,7 @@
                 });
             }
         } catch(e) {
-            document.getElementById('team-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+            document.getElementById('team-list').innerHTML = `<div style="color:#dc3545">加载失败: ${escapeHtml(e.message)}</div>`;
         }
     }
 
@@ -274,7 +274,8 @@
         }
     }
 
-    async function delTeam(teamId, teamName) {
+    async function delTeam(teamId) {
+        const teamName = teamsData.find(t => t.id === teamId)?.name || '该队伍';
         if (!confirm(`确认删除队伍"${teamName}"？该操作不可恢复。`)) return;
         try {
             await deleteTeam(teamId);
@@ -300,17 +301,17 @@
 
             const rows = users.map(u => `
                 <tr>
-                    <td><strong>${u.username}</strong></td>
+                    <td><strong>${escapeHtml(u.username)}</strong></td>
                     <td>
                         <span class="role-badge ${u.role === 'admin' ? 'role-admin' : u.role === 'operator' ? 'role-operator' : 'role-leader'}">
                             ${u.role === 'admin' ? '管理员' : u.role === 'operator' ? '操作员' : '队伍负责人'}
                         </span>
                     </td>
-                    <td>${u.team_id ? (teamMap[u.team_id] || '#' + u.team_id) : '-'}</td>
+                    <td>${escapeHtml(u.team_id ? (teamMap[u.team_id] || '#' + u.team_id) : '-')}</td>
                     <td>${u.is_active ? '✅' : '❌'}</td>
                     <td style="white-space:nowrap">
-                        <button class="btn btn-sm btn-primary" style="margin-right:4px" onclick="openEditModal(${u.id}, '${u.username}')">编辑</button>
-                        ${isAdmin() && u.id !== currentUserId ? `<button class="btn btn-sm btn-danger" onclick="disableUser(${u.id}, '${u.username}')">禁用</button>` : ''}
+                        <button class="btn btn-sm btn-primary" style="margin-right:4px" onclick="openEditModal(${u.id})">编辑</button>
+                        ${isAdmin() && u.id !== currentUserId ? `<button class="btn btn-sm btn-danger" onclick="disableUser(${u.id})">禁用</button>` : ''}
                     </td>
                 </tr>
             `).join('');
@@ -322,7 +323,7 @@
                 </table>
             `;
         } catch(e) {
-            document.getElementById('user-list').innerHTML = `<div style="color:#dc3545">加载失败: ${e.message}</div>`;
+            document.getElementById('user-list').innerHTML = `<div style="color:#dc3545">加载失败: ${escapeHtml(e.message)}</div>`;
         }
     }
 
@@ -355,7 +356,8 @@
         }
     }
 
-    async function disableUser(userId, username) {
+    async function disableUser(userId) {
+        const username = (await api.get('/auth/users')).find(u => u.id === userId)?.username || '该账号';
         if (!confirm(`确认禁用账号"${username}"？`)) return;
         try {
             await api.delete(`/auth/users/${userId}`);
@@ -368,7 +370,7 @@
 
     // ====== 编辑账号弹窗 ======
 
-    function openEditModal(userId, username) {
+    function openEditModal(userId) {
         // userId 为 null 表示编辑自己
         const info = getUserInfo();
         const targetId = userId ?? info?.id;
@@ -398,7 +400,7 @@
             errEl.style.display = 'block';
             return;
         }
-        if (password && password.length < 6) {
+        if (password && password.length < 10) {
             errEl.textContent = '密码至少10位';
             errEl.style.display = 'block';
             return;

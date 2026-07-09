@@ -392,8 +392,8 @@
             const list = document.getElementById('issues-list');
             list.innerHTML = issues.map(iss => `
                 <div class="issue-item ${iss.severity === 'error' ? 'issue-error' : 'issue-warn'}">
-                    <strong>${iss.worker_name}</strong>（${maskIdCard(iss.id_card)}）
-                    ${iss.field}：${iss.description}
+                    <strong>${escapeHtml(iss.worker_name)}</strong>（${escapeHtml(maskIdCard(iss.id_card))}）
+                    ${escapeHtml(iss.field)}：${escapeHtml(iss.description)}
                 </div>
             `).join('');
         } else {
@@ -429,9 +429,9 @@
                             ${checked} ${disabledAttr}
                             onchange="updateSelectedCount()">
                     </td>
-                    <td><strong>${w.name}</strong></td>
-                    <td style="font-size:12px;color:#888;">${maskIdCard(w.id_card)}</td>
-                    <td style="font-family:monospace;font-size:12px;">${w.bank_card || '-'}</td>
+                    <td><strong>${escapeHtml(w.name)}</strong></td>
+                    <td style="font-size:12px;color:#888;">${escapeHtml(maskIdCard(w.id_card))}</td>
+                    <td style="font-family:monospace;font-size:12px;">${escapeHtml(w.bank_card || '-')}</td>
                     <td><span class="badge ${st.badge}">${st.label}</span></td>
                     <td>${amount}</td>
                 </tr>
@@ -491,7 +491,7 @@
                 <div class="result-success">
                     ✅ 导入成功！新增 <strong>${result.created}</strong> 名工人，
                     更新 <strong>${result.updated}</strong> 名工人，
-                    共 <strong>${result.total}</strong> 人入正式库（${result.period}）。
+                    共 <strong>${result.total}</strong> 人入正式库（${escapeHtml(result.period)}）。
                 </div>
             `;
 
@@ -505,7 +505,7 @@
             document.getElementById('btn-confirm').disabled = false;
             const resultDiv = document.getElementById('import-result');
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `<div class="result-error">❌ 导入失败: ${e.message}</div>`;
+            resultDiv.innerHTML = `<div class="result-error">❌ 导入失败: ${escapeHtml(e.message)}</div>`;
             showToast('导入失败: ' + e.message, 'error');
         }
     }
