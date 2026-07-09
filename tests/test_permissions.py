@@ -118,6 +118,18 @@ class PermissionTestCase(unittest.TestCase):
         names = {item["name"] for item in response.json()}
         self.assertEqual(names, {"张三"})
 
+    def test_contract_upload_rejects_more_than_twenty_files(self):
+        headers = self._login_headers("admin", "AdminPass12345")
+        files = [
+            ("files", (f"contract-{index}.pdf", b"%PDF-1.4", "application/pdf"))
+            for index in range(21)
+        ]
+
+        response = self.client.post("/api/contracts/upload", headers=headers, files=files)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("最多上传 20", response.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

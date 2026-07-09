@@ -40,6 +40,7 @@ class CheckMissingRequest(BaseModel):
 
 
 ALLOWED_CONTRACT_EXTENSIONS = {'.pdf'}
+MAX_CONTRACT_BATCH_SIZE = 20
 
 
 def _save_file(file_content: bytes, filename: str, contract_id: int) -> str:
@@ -123,8 +124,11 @@ async def upload_contracts(
     db: Session = Depends(get_db),
 ):
     """批量上传用工协议PDF（管理员）"""
-    from services.ocr import parse_contract_pdf
+    from services.ocr import parse_contract_pdf, validate_contract_pdf
     import tempfile
+
+    if len(files) > MAX_CONTRACT_BATCH_SIZE:
+        raise HTTPException(status_code=400, detail=f"一次最多上传 {MAX_CONTRACT_BATCH_SIZE} 份合同，请分批上传")
 
     results = []
     for file in files:
@@ -139,7 +143,11 @@ async def upload_contracts(
             tmp_path = tmp.name
 
         try:
+            validate_contract_pdf(tmp_path)
             ocr_result = parse_contract_pdf(tmp_path)
+        except ValueError as e:
+            results.append({"filename": safe_display_filename(file.filename), "error": str(e)})
+            continue
         except Exception as e:
             ocr_result = {'name': '', 'id_card': '', 'daily_wage': None,
                          'template_valid': False, 'missing_keywords': [], 'error': str(e)}
@@ -327,7 +335,7 @@ def reocr_contract(
     db: Session = Depends(get_db),
 ):
     """对已存储的PDF重新运行OCR（管理员）"""
-    from services.ocr import parse_contract_pdf
+    from services.ocr import parse_contract_pdf, validate_contract_pdf
 
     contract = db.query(WorkerContract).filter(WorkerContract.id == contract_id).first()
     if not contract:
@@ -336,7 +344,10 @@ def reocr_contract(
         raise HTTPException(status_code=400, detail="原始PDF文件不存在，请重新上传")
 
     try:
+        validate_contract_pdf(contract.file_path)
         ocr_result = parse_contract_pdf(contract.file_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR失败: {e}")
 
@@ -354,7 +365,7 @@ async def replace_contract_file(
     db: Session = Depends(get_db),
 ):
     """替换协议PDF并重新OCR（管理员）"""
-    from services.ocr import parse_contract_pdf
+    from services.ocr import parse_contract_pdf, validate_contract_pdf
     import tempfile
 
     contract = db.query(WorkerContract).filter(WorkerContract.id == contract_id).first()
@@ -370,7 +381,10 @@ async def replace_contract_file(
         tmp_path = tmp.name
 
     try:
+        validate_contract_pdf(tmp_path)
         ocr_result = parse_contract_pdf(tmp_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         ocr_result = {'name': '', 'id_card': '', 'daily_wage': None,
                      'template_valid': False, 'missing_keywords': [], 'error': str(e)}

@@ -9,6 +9,11 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+OCR_RESOLUTION = 150
+MAX_CONTRACT_PAGES = 20
+MAX_CONTRACT_PAGE_PIXELS = 5_000_000
+MAX_CONTRACT_TOTAL_PIXELS = 60_000_000
+
 # 劳动报酬条款必须包含的关键字（用于模板验证）
 TEMPLATE_KEYWORDS = [
     "劳动报酬",
@@ -18,7 +23,7 @@ TEMPLATE_KEYWORDS = [
 ]
 
 
-def _ocr_page(page, resolution: int = 300) -> str:
+def _ocr_page(page, resolution: int = OCR_RESOLUTION) -> str:
     """对 pdfplumber 的一页做 OCR，返回识别文字"""
     try:
         import pytesseract
@@ -38,16 +43,44 @@ def _ocr_page(page, resolution: int = 300) -> str:
 def _extract_name(text: str) -> str:
     """从第1页文字中提取姓名"""
     patterns = [
-        r'乙\s*方\s*[（(]\s*劳\s*动\s*者\s*[）)]\s*姓\s*名\s*[:：,，]\s*_*\s*([^\s_\n，。]{2,5})',
-        r'姓\s*名\s*[:：,，]\s*_*\s*([^\s_\n，。]{2,5})',
+        r'乙\s*方\s*[（(]?\s*劳\s*动\s*者\s*[）)]?\s*姓\s*名\s*[:：,，;；]\s*_*\s*([\u4e00-\u9fa5·• \t]{2,16})',
+        r'姓\s*名\s*[:：,，;；]\s*_*\s*([\u4e00-\u9fa5·• \t]{2,16})',
     ]
     for pat in patterns:
         m = re.search(pat, text)
         if m:
-            name = m.group(1).strip().strip('_').strip()
-            if 2 <= len(name) <= 5:
+            name = re.sub(r'\s+', '', m.group(1)).strip('_').strip()
+            if re.fullmatch(r'[\u4e00-\u9fa5·•]{2,5}', name):
                 return name
     return ''
+
+
+def validate_contract_pdf_pages(pages: list[tuple[float, float]]) -> None:
+    """校验合同 PDF 页数和按默认 OCR 分辨率估算的像素量。"""
+    if not pages:
+        raise ValueError("PDF无页面")
+    if len(pages) > MAX_CONTRACT_PAGES:
+        raise ValueError(f"PDF页数过多，最多允许 {MAX_CONTRACT_PAGES} 页")
+
+    total_pixels = 0
+    for page_number, (width_points, height_points) in enumerate(pages, start=1):
+        page_pixels = int((width_points / 72 * OCR_RESOLUTION) * (height_points / 72 * OCR_RESOLUTION))
+        if page_pixels > MAX_CONTRACT_PAGE_PIXELS:
+            raise ValueError(
+                f"第 {page_number} 页像素过大，单页最多允许 {MAX_CONTRACT_PAGE_PIXELS // 1_000_000} 百万像素"
+            )
+        total_pixels += page_pixels
+
+    if total_pixels > MAX_CONTRACT_TOTAL_PIXELS:
+        raise ValueError(f"PDF总像素过大，最多允许 {MAX_CONTRACT_TOTAL_PIXELS // 1_000_000} 百万像素")
+
+
+def validate_contract_pdf(file_path: str) -> None:
+    """在 OCR 前检查 PDF，避免异常大文件耗尽服务资源。"""
+    import pdfplumber
+
+    with pdfplumber.open(file_path) as pdf:
+        validate_contract_pdf_pages([(page.width, page.height) for page in pdf.pages])
 
 
 def _extract_id_card(text: str) -> str:
@@ -126,9 +159,7 @@ def parse_contract_pdf(file_path: str) -> Dict[str, Any]:
 
     try:
         with pdfplumber.open(file_path) as pdf:
-            if not pdf.pages:
-                result['error'] = 'PDF无页面'
-                return result
+            validate_contract_pdf_pages([(page.width, page.height) for page in pdf.pages])
 
             # 第1页：识别姓名和身份证号
             page1_text = _ocr_page(pdf.pages[0])
